@@ -6,15 +6,27 @@ from audit_contrast import audit, _nearest_passing
 from lint_design import lint_repo
 
 
-def test_audit_flags_low_contrast_pair():
+def test_audit_enforces_text_on_surface_not_brand_fills():
     colors = {"foreground": "#14110e", "background": "#f7f5ef", "accent": "#c9a227"}
-    rows = audit(colors)
-    by_pair = {(r["text"], r["surface"]): r for r in rows}
-    # ink on warm paper is excellent
-    assert by_pair[("foreground", "background")]["aa_normal"] is True
-    # gold on warm paper is low contrast -> fails AA-large
-    assert by_pair[("accent", "background")]["aa_large"] is False
-    assert "suggest" in by_pair[("accent", "background")]
+    by_pair = {(r["text"], r["surface"]): r for r in audit(colors)}
+    # ink on warm paper is an enforced pair and excellent
+    fg_bg = by_pair[("foreground", "background")]
+    assert fg_bg["aa_normal"] is True and fg_bg["informational"] is False
+    # gold (brand fill) AS text on paper is advisory, not a gate failure
+    assert by_pair[("accent", "background")]["informational"] is True
+
+
+def test_audit_flags_real_low_contrast_text():
+    colors = {"foreground": "#9aa0a6", "background": "#f7f5ef"}  # gray text on paper
+    row = audit(colors)[0]
+    assert row["informational"] is False
+    assert row["aa_large"] is False and "suggest" in row
+
+
+def test_audit_enforces_on_token_against_its_base():
+    colors = {"primary": "#2563eb", "on-primary": "#0a0a0a"}  # dark text on blue button
+    row = next(r for r in audit(colors) if r["text"] == "on-primary" and r["surface"] == "primary")
+    assert row["informational"] is False  # on-primary on primary IS enforced
 
 
 def test_nearest_passing_returns_a_passing_shade():

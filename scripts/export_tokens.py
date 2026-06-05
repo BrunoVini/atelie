@@ -21,6 +21,7 @@ Usage:
 """
 import json
 import os
+import re
 import sys
 
 # Map a token group to its W3C Design Tokens `$type`.
@@ -68,9 +69,25 @@ def to_w3c_tokens(tokens):
         ttype = _TYPE_MAP.get(group, "other")
         out[group] = {}
         for k, v in items.items():
-            value = [v] if ttype == "fontFamily" and not isinstance(v, list) else v
-            out[group][k] = {"$value": value, "$type": ttype}
+            out[group][k] = {"$value": _w3c_value(ttype, v), "$type": ttype}
     return out
+
+
+def _w3c_value(ttype, v):
+    """Coerce a raw value into the W3C Design Tokens shape for its $type."""
+    if ttype == "fontFamily":
+        return v if isinstance(v, list) else [v]
+    if ttype == "duration" and isinstance(v, str):
+        m = re.match(r"([\d.]+)\s*(ms|s)", v)
+        if m:
+            return {"value": float(m.group(1)), "unit": m.group(2)}
+    if ttype == "cubicBezier" and isinstance(v, str):
+        m = re.search(r"cubic-bezier\(([^)]+)\)", v)
+        if m:
+            nums = [float(x) for x in m.group(1).split(",")]
+            if len(nums) == 4:
+                return nums
+    return v
 
 
 def to_tailwind_preset(tokens):

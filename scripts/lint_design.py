@@ -17,6 +17,7 @@ import sys
 from scan_repo import (
     _HEX, _RGB, _HSL, _hex_to_rgb, _hsl_to_rgb, _rgb_to_hex, _delta_e,
     _STYLE_EXT, _CODE_EXT, _SKIP_DIRS, _LEN, _FONT_FAMILY, _GENERIC_FONTS,
+    _TW_COLOR_CLASS, _TW_COLORS,
 )
 
 DELTA_E = 8.0
@@ -33,7 +34,10 @@ def _load_contract(path):
             out[name] = v
         return out
 
-    colors = {v.lower(): n for n, v in values("color").items() if isinstance(v, str) and v.startswith("#")}
+    colors = {}
+    for n, v in values("color").items():  # first token wins -> deterministic
+        if isinstance(v, str) and v.startswith("#") and v.lower() not in colors:
+            colors[v.lower()] = n
     fonts = set()
     for v in values("font").values():
         fonts.update(v if isinstance(v, list) else [v])
@@ -85,6 +89,19 @@ def lint_repo(root, contract_path):
                         findings.append({
                             "file": rel, "line": i, "kind": "color", "value": raw,
                             "severity": "important", "fix": fix,
+                        })
+                # off-palette Tailwind named color classes (bg-purple-600, ...)
+                for token in _TW_COLOR_CLASS.findall(line):
+                    hexv = _TW_COLORS.get(token)
+                    if not hexv:
+                        continue
+                    name, d = _nearest_token(_hex_to_rgb(hexv), colors)
+                    if d > DELTA_E:
+                        fix = (f"use var(--color-{name}) (nearest token)"
+                               if name and d <= 40 else "off-palette — pick a contract color")
+                        findings.append({
+                            "file": rel, "line": i, "kind": "color",
+                            "value": f"{token} ({hexv})", "severity": "important", "fix": fix,
                         })
                 # off-contract fonts
                 for decl in _FONT_FAMILY.findall(line):

@@ -31,10 +31,17 @@ _STRESS_STATES = [
 
 
 def _image_sources(product_type, n=4):
-    """Real image sources (per design-philosophy: real images, never drawn SVG)."""
+    """Real image sources (per design-philosophy: real images, never drawn SVG).
+
+    Uses picsum.photos (live) for stand-in photography — source.unsplash.com was
+    retired in 2024. For real product/brand imagery, pull from the Unsplash API or
+    Wikimedia Commons (the latter for portraits/objects intrinsically linked to
+    the content).
+    """
     kw = product_type.lower().replace(" ", "-").replace("/", "-")
-    return [f"https://source.unsplash.com/1200x800/?{kw}" for _ in range(n)] + [
-        "https://commons.wikimedia.org/  (for portraits/objects intrinsically linked to content)"
+    return [f"https://picsum.photos/seed/{kw}-{i}/1200/800" for i in range(n)] + [
+        "Unsplash API (https://unsplash.com/developers) — keyword: " + kw,
+        "Wikimedia Commons — for portraits/objects intrinsically linked to content",
     ]
 
 

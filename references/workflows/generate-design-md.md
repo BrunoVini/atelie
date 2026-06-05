@@ -47,8 +47,9 @@ Build a token dict (see `references/design-md-spec.md` for the shape) from the
 agreed palette/type/spacing, then:
 
 ```bash
-python3 scripts/export_tokens.py /tmp/atelier-tokens.json
-# -> design/tokens.css, design/tailwind-preset.js, design/design-tokens.json
+python3 scripts/export_tokens.py /tmp/atelier-tokens.json <repo>/design
+# -> <repo>/design/{tokens.css, tailwind-preset.js, design-tokens.json}
+# Always pass the repo's design dir explicitly — the default is the CWD.
 ```
 
 If the repo already has a token location (e.g. a `theme.ts`, a tailwind config),
@@ -57,8 +58,8 @@ prefer writing there / wiring the preset in, rather than imposing `design/`.
 ### 6. Build the living style guide (offer)
 
 ```bash
-python3 scripts/census.py <repo> --out design/components.json   # populate §7
-python3 scripts/build_styleguide.py design/design-tokens.json   # -> design/styleguide.html
+python3 scripts/census.py <repo> --out <repo>/design/components.json   # populate §7
+python3 scripts/build_styleguide.py <repo>/design/design-tokens.json -o <repo>/design/styleguide.html
 ```
 The style guide renders the measured palette (with contrast labels), type scale,
 spacing/radius, and the component inventory — serve it via the preview server.

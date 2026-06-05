@@ -10,5 +10,5 @@ by *nextlevelbuilder*, version 2.5.0.
   trimmed subset** of the original CSVs (essential columns only) to keep the
   context footprint small. Attribution is recorded in the README "Credits".
 
-Upstream cache location (for refreshing the subset):
-`/home/bruno/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/data/`
+To refresh the subset, re-distill from the upstream ui-ux-pro-max plugin's
+`data/` CSVs (in your local plugin cache, or from the upstream repository).

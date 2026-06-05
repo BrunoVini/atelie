@@ -24,7 +24,7 @@ def run(repo, contract, max_drift=0, allow_contrast_fail=False):
     results["ok"] &= drift_ok
 
     colors = _load_colors(contract)
-    fails = [r for r in audit(colors) if not r["aa_large"]]
+    fails = [r for r in audit(colors) if not r["aa_large"] and not r.get("informational")]
     contrast_ok = allow_contrast_fail or not fails
     results["steps"].append({"step": "contrast-audit", "fails": len(fails), "ok": contrast_ok})
     results["ok"] &= contrast_ok

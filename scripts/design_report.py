@@ -31,7 +31,7 @@ def build_report(repo, contract_path):
     drift = lint_repo(repo, contract_path)
     colors, fonts = _contract_colors(contract_path)
     contrast_rows = audit(colors)
-    contrast_fails = [r for r in contrast_rows if not r["aa_large"]]
+    contrast_fails = [r for r in contrast_rows if not r["aa_large"] and not r.get("informational")]
     census = build_census(repo)
     dupes = census["duplicates"]
     scan = scan_directory(repo)

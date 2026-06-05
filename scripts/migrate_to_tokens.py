@@ -1,9 +1,10 @@
 """Token-migration codemod — rewrite hardcoded colors to var(--token).
 
 Closes the loop from measure -> enforce -> *fix*: turn `color: #2563eb` into
-`color: var(--color-primary)` across the repo's stylesheets, so the codebase
-actually obeys its own contract. DRY-RUN BY DEFAULT (prints a unified diff);
-pass --apply to write. Pair with diff_screens.mjs to prove "zero pixels moved".
+`color: var(--color-primary)` in the repo's **stylesheets** (CSS/SCSS/Sass/Less)
+— JSX inline styles and Tailwind classes are out of scope. Skips the generated
+`design/` token files. DRY-RUN BY DEFAULT (prints a unified diff); pass --apply to
+write. Pair with diff_screens.mjs to prove "zero pixels moved".
 
 Usage:
     python3 migrate_to_tokens.py <repo> [--contract design/design-tokens.json]

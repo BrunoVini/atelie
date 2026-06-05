@@ -75,7 +75,8 @@ Routing for every capability is in `SKILL.md`; depth lives in `references/`.
 ## Development
 
 ```bash
-python3 -m pytest tests/ -v   # script test suite
+pip install pytest              # (test dep; not bundled)
+python3 -m pytest tests/ -v     # script test suite
 ```
 
 ## License

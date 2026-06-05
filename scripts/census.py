@@ -33,8 +33,7 @@ _PROP_NAME = re.compile(r"(\w+)\??\s*:")
 
 
 def _component_name_from_path(p):
-    base = os.path.splitext(os.path.basename(p))[0]
-    return base if base[:1].isupper() else base
+    return os.path.splitext(os.path.basename(p))[0]
 
 
 def scan_components(root):
@@ -103,7 +102,8 @@ if __name__ == "__main__":
             print("\n⚠ possible duplicates (same name, multiple files):")
             for n, files in census["duplicates"].items():
                 print(f"  {n}: {', '.join(files)}")
-    out = "design/components.json"
+    # Default to the SCANNED repo's design/ dir, not the current working dir.
+    out = os.path.join(root, "design", "components.json")
     if "--out" in args:
         out = args[args.index("--out") + 1]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
