@@ -48,7 +48,9 @@ def migrate_repo(root, contract_path, apply=False):
     contract_colors = {h: n for h, n in colors_by_hex.items()}
     diffs, total = [], 0
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        # Skip build/vendor dirs AND the generated token files in design/ —
+        # rewriting tokens.css would make the token definitions self-referential.
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and d != "design"]
         for fn in filenames:
             if not fn.endswith(_STYLE_EXT):
                 continue

@@ -55,6 +55,7 @@ purple gradient. This applies no matter how "quick" the request seems.
 
 | The user wants… | Read | Key assets / scripts |
 |---|---|---|
+| Plan a robust / multi-surface design effort (multi-page, redesign, rollout) | `references/workflows/design-plan.md` | contract + council |
 | A DESIGN.md / design system / "map our design" | `references/workflows/generate-design-md.md` | `scripts/scan_repo.py`, `scripts/export_tokens.py` |
 | "Make it like this" / import a reference / cold start | `references/workflows/generate-design-md.md` | `scripts/import_reference.py` |
 | Realistic content / fill a mockup / test empty·loading states | `references/capabilities/content.md` | `scripts/seed_content.py` |
@@ -66,6 +67,11 @@ purple gradient. This applies no matter how "quick" the request seems.
 | A critique / review / score a layout / "is this good?" | `references/capabilities/review.md` | `scripts/screenshot.mjs` |
 | A hard call / "weigh the options" / decide a direction | `references/capabilities/council.md` | (5-agent council) |
 | Check the repo doesn't drift from DESIGN.md (design lint) | `references/workflows/enforce-coherence.md` | `scripts/lint_design.py` |
+| Migrate hardcoded values to tokens (codemod) | `references/workflows/enforce-coherence.md` | `scripts/migrate_to_tokens.py` |
+| A design-debt report / coherence score / trend | `references/workflows/design-debt.md` | `scripts/design_report.py` |
+| Gate design in CI / pre-commit | `references/workflows/ci.md` | `scripts/check.py` |
+| Onboard the team to the design language | `references/workflows/onboarding.md` | `scripts/build_onboarding.py` |
+| Design-review a pull request | `references/workflows/pr-review.md` | `scripts/lint_design.py` |
 | Audit accessibility / contrast against the palette | `references/capabilities/review.md` | `scripts/audit_contrast.py` |
 | A living style guide page (swatches, scale, components) | `references/workflows/generate-design-md.md` | `scripts/build_styleguide.py` |
 | Verify a change didn't regress (visual/responsive diff) | `references/capabilities/review.md` | `scripts/diff_screens.mjs` |
