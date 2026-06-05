@@ -1,0 +1,23 @@
+# atelier design QA gate — copy to <repo>/.github/workflows/atelier.yml
+# Requires design/design-tokens.json (run atelier's generate-design-md first)
+# and the atelier scripts available (vendored, submodule, or pip path).
+name: atelier design check
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  design-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Adjust ATELIER to where the atelier skill scripts live in your setup.
+      - name: atelier check (drift lint + contrast audit)
+        env:
+          ATELIER: ${{ github.workspace }}/.atelier/scripts
+        run: |
+          python3 "$ATELIER/check.py" . --contract design/design-tokens.json

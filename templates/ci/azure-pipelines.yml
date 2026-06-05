@@ -1,0 +1,20 @@
+# atelier design QA gate — Azure Pipelines equivalent.
+# Requires design/design-tokens.json and the atelier scripts on the agent.
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: ['*']
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.12'
+  - script: |
+      python3 "$(Build.SourcesDirectory)/.atelier/scripts/check.py" . \
+        --contract design/design-tokens.json
+    displayName: 'atelier check (drift lint + contrast audit)'
