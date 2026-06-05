@@ -1,10 +1,12 @@
 """Token-migration codemod — rewrite hardcoded colors to var(--token).
 
-Closes the loop from measure -> enforce -> *fix*: turn `color: #2563eb` into
-`color: var(--color-primary)` in the repo's **stylesheets** (CSS/SCSS/Sass/Less)
-— JSX inline styles and Tailwind classes are out of scope. Skips the generated
-`design/` token files. DRY-RUN BY DEFAULT (prints a unified diff); pass --apply to
-write. Pair with diff_screens.mjs to prove "zero pixels moved".
+Closes the loop from measure -> enforce -> *fix*:
+  - stylesheets (CSS/SCSS/Sass/Less): rewrite any near-token hex to var(--token);
+  - code (JSX/TSX/Vue/Svelte): rewrite Tailwind ARBITRARY values `bg-[#hex]` to
+    `bg-[var(--token)]` (bracketed = unambiguously styling; bare hex in JS is left
+    alone to stay safe).
+Skips the generated `design/` token files. DRY-RUN BY DEFAULT (prints a unified
+diff); pass --apply to write. Pair with diff_screens.mjs to prove "zero pixels moved".
 
 Usage:
     python3 migrate_to_tokens.py <repo> [--contract design/design-tokens.json]
@@ -15,10 +17,13 @@ import os
 import re
 import sys
 
-from scan_repo import _HEX, _hex_to_rgb, _delta_e, _STYLE_EXT, _SKIP_DIRS
+from scan_repo import _HEX, _hex_to_rgb, _delta_e, _STYLE_EXT, _CODE_EXT, _SKIP_DIRS
 from lint_design import _load_contract
 
 DELTA_E = 4.0  # only rewrite values that are essentially a token (tight match)
+
+# Tailwind arbitrary color value, e.g. bg-[#2563eb] -> bg-[var(--color-primary)].
+_TW_ARBITRARY = re.compile(r"(-\[)#([0-9a-fA-F]{3,8})(\])")
 
 
 def _token_for(rgb, contract_colors):
@@ -44,6 +49,21 @@ def migrate_text(text, contract_colors):
     return _HEX.sub(repl, text), count[0]
 
 
+def migrate_code_text(text, contract_colors):
+    """Rewrite only Tailwind ARBITRARY color values in code (safe): bracketed
+    `-[#hex]` is unambiguously a styling context, unlike a bare hex in JS."""
+    count = [0]
+
+    def repl(m):
+        name, d = _token_for(_hex_to_rgb("#" + m.group(2)), contract_colors)
+        if name:
+            count[0] += 1
+            return f"{m.group(1)}var(--color-{name}){m.group(3)}"
+        return m.group(0)
+
+    return _TW_ARBITRARY.sub(repl, text), count[0]
+
+
 def migrate_repo(root, contract_path, apply=False):
     colors_by_hex, _, _ = _load_contract(contract_path)
     contract_colors = {h: n for h, n in colors_by_hex.items()}
@@ -53,14 +73,18 @@ def migrate_repo(root, contract_path, apply=False):
         # rewriting tokens.css would make the token definitions self-referential.
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and d != "design"]
         for fn in filenames:
-            if not fn.endswith(_STYLE_EXT):
+            is_style = fn.endswith(_STYLE_EXT)
+            is_code = fn.endswith(_CODE_EXT)
+            if not (is_style or is_code):
                 continue
             p = os.path.join(dirpath, fn)
             try:
                 orig = open(p, encoding="utf-8").read()
             except Exception:
                 continue
-            new, n = migrate_text(orig, contract_colors)
+            # Stylesheets: rewrite any near-token hex. Code: only Tailwind
+            # arbitrary `-[#hex]` (rewriting bare hex in JS would be unsafe).
+            new, n = (migrate_text if is_style else migrate_code_text)(orig, contract_colors)
             if n:
                 total += n
                 rel = os.path.relpath(p, root)

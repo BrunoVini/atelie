@@ -112,3 +112,17 @@ def test_contrast_ratio():
     # black on white is 21:1
     assert round(contrast_ratio(_hex_to_rgb("#000000"), _hex_to_rgb("#ffffff"))) == 21
     assert contrast_ratio(_hex_to_rgb("#777777"), _hex_to_rgb("#ffffff")) < 4.5
+
+
+def test_full_tailwind_palette_loaded():
+    from scan_repo import _TW_COLORS
+    assert len(_TW_COLORS) > 200            # full v3 palette, not the small subset
+    assert _TW_COLORS["teal-300"] == "#5eead4"
+    assert _TW_COLORS["rose-950"] == "#4c0519"
+
+
+def test_spacing_radius_from_css_in_js():
+    from scan_repo import extract_spacing, extract_radius
+    code = "styled.div`padding: 16px; gap: 8px; border-radius: 12px;`"
+    assert set(extract_spacing(code)) >= {"8px", "16px"}
+    assert "12px" in extract_radius(code)

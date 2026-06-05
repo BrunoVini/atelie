@@ -221,10 +221,11 @@ _TW_RADIUS_MAP = {
     "xl": "12px", "2xl": "16px", "3xl": "24px", "full": "9999px",
 }
 _TW_RADIUS = re.compile(r"\brounded(?:-(none|sm|md|lg|xl|2xl|3xl|full))?\b")
-# A compact slice of the default Tailwind palette (common brand/CTA shades), so
-# `bg-blue-600` etc. resolve. Custom brand colors usually come from the config
-# (caught as hex by _parse_colors); this covers the default-class case.
-_TW_COLORS = {
+# Default Tailwind palette so named classes (`bg-blue-600`, `text-teal-300`, …)
+# resolve to a hex. The full official v3 palette lives in tailwind_colors.json;
+# this inline subset is the fallback if that file is missing. Custom brand colors
+# usually come from the config (caught as hex by _parse_colors).
+_TW_COLORS_FALLBACK = {
     "slate-900": "#0f172a", "slate-700": "#334155", "slate-500": "#64748b",
     "gray-900": "#111827", "gray-700": "#374151", "zinc-900": "#18181b",
     "red-600": "#dc2626", "red-500": "#ef4444", "orange-500": "#f97316",
@@ -234,6 +235,21 @@ _TW_COLORS = {
     "indigo-600": "#4f46e5", "indigo-500": "#6366f1", "violet-600": "#7c3aed",
     "purple-600": "#9333ea", "pink-600": "#db2777", "rose-500": "#f43f5e",
 }
+
+
+def _load_tw_palette():
+    """Flatten tailwind_colors.json ({family:{shade:hex}}) to {family-shade:hex}."""
+    path = os.path.join(os.path.dirname(__file__), "tailwind_colors.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return {f"{fam}-{shade}": hexv
+                for fam, shades in data.items() for shade, hexv in shades.items()}
+    except Exception:
+        return {}
+
+
+_TW_COLORS = {**_TW_COLORS_FALLBACK, **_load_tw_palette()}
 _TW_COLOR_CLASS = re.compile(
     r"\b(?:bg|text|border|ring|fill|stroke|from|to|via)-([a-z]+-\d{2,3})\b")
 _TW_FONT_BLOCK = re.compile(r"fontFamily\s*:\s*\{([^}]*)\}", re.S)
@@ -373,9 +389,12 @@ def scan_directory(root):
         if f not in fonts:
             fonts.append(f)
 
-    # Spacing / radius: CSS values + Tailwind utility steps, merged + sorted.
-    spacing = _merge_scales(extract_spacing(style_blob), extract_tailwind_spacing(code_blob))
-    radius = _merge_scales(extract_radius(style_blob), extract_tailwind_radius(code_blob))
+    # Spacing / radius: CSS values (stylesheets AND CSS-in-JS / inline styles in
+    # code) + Tailwind utility steps, merged + sorted.
+    spacing = _merge_scales(extract_spacing(style_blob + "\n" + code_blob),
+                            extract_tailwind_spacing(code_blob))
+    radius = _merge_scales(extract_radius(style_blob + "\n" + code_blob),
+                           extract_tailwind_radius(code_blob))
 
     return {
         "framework": detect_framework(pkg),

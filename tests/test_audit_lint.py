@@ -4,6 +4,7 @@ import os
 
 from audit_contrast import audit, _nearest_passing
 from lint_design import lint_repo
+from migrate_to_tokens import migrate_code_text, migrate_text
 
 
 def test_audit_enforces_text_on_surface_not_brand_fills():
@@ -27,6 +28,15 @@ def test_audit_enforces_on_token_against_its_base():
     colors = {"primary": "#2563eb", "on-primary": "#0a0a0a"}  # dark text on blue button
     row = next(r for r in audit(colors) if r["text"] == "on-primary" and r["surface"] == "primary")
     assert row["informational"] is False  # on-primary on primary IS enforced
+
+
+def test_migrate_rewrites_tailwind_arbitrary_and_css():
+    contract = {"#0b3d2e": "primary", "#c9a227": "accent"}
+    code, n = migrate_code_text('<div className="bg-[#0b3d2e] text-[#c9a227] p-4"/>', contract)
+    assert n == 2
+    assert "bg-[var(--color-primary)]" in code and "text-[var(--color-accent)]" in code
+    css, m = migrate_text(".s{color:#0b3d2e;}", contract)
+    assert m == 1 and "var(--color-primary)" in css
 
 
 def test_nearest_passing_returns_a_passing_shade():
