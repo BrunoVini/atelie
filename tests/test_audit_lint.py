@@ -30,6 +30,17 @@ def test_audit_enforces_on_token_against_its_base():
     assert row["informational"] is False  # on-primary on primary IS enforced
 
 
+def test_slop_check_flags_tells_but_respects_contract():
+    from slop_check import check_html
+    slop = ('<style>body{font-family:Inter,sans-serif}'
+            '.hero{background:linear-gradient(135deg,#8b5cf6,#6366f1)}</style>')
+    kinds = {f["kind"] for f in check_html(slop)}
+    assert "generic-font" in kinds and "purple-gradient" in kinds
+    # contract-sanctioned font is not slop
+    assert not any(f["kind"] == "generic-font" for f in check_html('<style>body{font-family:Inter}</style>', ["Inter"]))
+    assert check_html('<style>body{font-family:Fraunces,serif}</style>') == []
+
+
 def test_assess_consistency_levels():
     from assess import assess
     clean = {"colors": [{"hex": "#2563eb", "count": 9}, {"hex": "#ea580c", "count": 4},

@@ -32,9 +32,15 @@ fall back to reviewing the served preview (`preview.md`) or the source.
 | 4 | Functionality & a11y | Works / buildable / accessible (contrast, targets, reduced motion)? |
 | 5 | Innovation | A memorable, non-generic idea — or AI slop? |
 
-Compute a **total /50** and an overall verdict. Cross-check against
-`design-philosophy.md` §3 and the project's anti-slop blocklist — this check is
-mandatory.
+Compute a **total /50** and an overall verdict. The anti-slop check is mandatory —
+and now backed by a script, not just judgement:
+
+```bash
+python3 scripts/slop_check.py <page.html> --contract <repo>   # generic fonts, purple
+# gradient, gratuitous glassmorphism, card+left-border cliché, too many fonts
+```
+Contract-sanctioned fonts are not flagged. Treat an `important` finding as a fail
+of dimension 5 (Innovation). Still cross-check `design-philosophy.md` §3 by eye.
 
 For dimensions 1 and 4, back the score with **measured evidence**, not vibes:
 

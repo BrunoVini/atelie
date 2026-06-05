@@ -92,6 +92,7 @@ flags violations.
 | Make a layout work across screens / fix the tablet mid-range / responsive | `references/capabilities/responsive.md` | `scripts/responsive_check.mjs` |
 | Verify a change didn't regress (visual/responsive diff) | `references/capabilities/review.md` | `scripts/diff_screens.mjs` |
 | A performance / weight budget for a page | `references/capabilities/review.md` | `scripts/perf_budget.py` |
+| Verify output isn't generic AI slop | `references/capabilities/review.md` | `scripts/slop_check.py` |
 | Reuse existing components / component inventory | `references/workflows/census.md` | `scripts/census.py` |
 | A motion / interaction spec | `references/capabilities/motion-spec.md` | `scripts/export_tokens.py` |
 | Multi-brand / dark mode / white-label theming | `references/workflows/cross-platform.md` | `scripts/export_tokens.py` |
