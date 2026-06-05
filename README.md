@@ -33,9 +33,20 @@ optional and need Node + a headless browser.
 These are not "generate a page" features — they're why atelier is different:
 
 - **Empirical DESIGN.md contract.** It clusters the real colors in your code
-  (perceptual ΔE), reads your fonts, spacing, radius, framework, and component
-  library — from stylesheets *and* Tailwind classes / `tailwind.config` /
-  `theme.ts` / CSS-in-JS — and writes a contract grounded in fact, not guesswork.
+  (perceptual ΔE — incl. `oklch`/`lab`/`color-mix`), reads your fonts, spacing,
+  radius, breakpoints, framework, and component library — from stylesheets,
+  Tailwind classes / `tailwind.config` / **Tailwind v4 `@theme`**, `theme.ts`,
+  CSS-in-JS, design-token custom properties, and across a **monorepo** — and
+  writes a contract grounded in fact, not guesswork.
+- **Honest about messes.** It grades a repo's consistency first; a coherent repo
+  is auto-mapped, a chaotic one gets a per-dimension warning with the best options
+  pre-selected for you to choose — it never writes a confident contract over chaos.
+- **Slop-detector on the output.** Scans generated HTML for the AI tells (generic
+  fonts, purple gradient, gratuitous glassmorphism) — "no slop" is a *check*, not
+  just a prompt.
+- **Responsiveness that survives the tablet zone.** A width sweep
+  (360→1920, incl. 768–1024) flags horizontal overflow per breakpoint, so the
+  mid-range stops breaking silently.
 - **Enforceable tokens.** Exports `tokens.css`, a Tailwind preset, and W3C
   `design-tokens.json`, so the contract lives in code, not just prose.
 - **Design lint ("design ESLint").** Flags off-contract colors/fonts with
@@ -59,9 +70,11 @@ These are not "generate a page" features — they're why atelier is different:
   work (each task carries measurable acceptance criteria).
 
 …plus screenshot-based scoring, visual-regression diffing, performance budgets,
-motion specs, multi-brand/dark-mode theming, reference import (image/URL),
-realistic-content seeding, team onboarding packs, and high-quality generation of
-prototypes, slides, and narrated animations — all bound to the contract.
+motion specs, multi-brand/dark-mode theming, **native theme codegen
+(SwiftUI/Flutter/React Native)**, **i18n/RTL logical-property linting**, reference
+import (image/URL), realistic-content seeding, team onboarding packs, SVG, and
+high-quality generation of prototypes, slides, and narrated animations (with the
+full huashu motion-craft references) — all bound to the contract.
 
 ## How it works
 
@@ -74,13 +87,19 @@ that way.
 
 ```bash
 python3 scripts/scan_repo.py <repo>                         # empirical design report
+python3 scripts/assess.py <repo>                            # consistency: clean | minor | messy
 python3 scripts/export_tokens.py tokens.json design         # tokens.css + preset + W3C json
-python3 scripts/lint_design.py . --contract design/design-tokens.json   # design lint
-python3 scripts/audit_contrast.py design/design-tokens.json # WCAG contrast audit
-python3 scripts/check.py .                                  # CI gate (lint + contrast)
-python3 scripts/design_report.py .                          # coherence score -> DESIGN-DEBT.md
+python3 scripts/export_native.py <repo>                     # SwiftUI / Flutter / RN theme files
+python3 scripts/lint_design.py <repo>                       # design lint (resolves DESIGN.md or json)
+python3 scripts/audit_contrast.py <repo>                    # WCAG contrast audit
+python3 scripts/check_rules.py <repo>                       # house rules ("no flyouts")
+python3 scripts/check_rtl.py <repo>                         # i18n/RTL logical-property lint
+python3 scripts/check.py <repo>                             # CI gate (lint + contrast + rules)
+python3 scripts/design_report.py <repo>                     # coherence score -> DESIGN-DEBT.md
+python3 scripts/slop_check.py page.html --contract <repo>   # AI-slop tells
 python3 scripts/build_styleguide.py design/design-tokens.json   # living style guide
 scripts/preview/start.sh --project-dir <repo>              # live preview server
+node scripts/responsive_check.mjs page.html                # width sweep (tablet zone)
 node scripts/screenshot.mjs page.html shot.png             # capture for review/scoring
 node scripts/diff_screens.mjs page.html                    # visual-regression diff
 ```
