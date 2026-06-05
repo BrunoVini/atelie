@@ -51,15 +51,17 @@ def _from_design_md(path):
         hexes = _HEX.findall(line)
         if not hexes:
             continue
-        # Name the color from a --token on the line, else the first table cell (role).
+        # Prefer the table's Role cell (col 0) — it's the semantic role the contrast
+        # audit needs (background/foreground/primary...). Fall back to a --token name.
         name = None
-        mtok = re.search(r"--(?:color-)?([a-zA-Z][\w-]*)", line)
-        if mtok:
-            name = mtok.group(1)
-        elif "|" in line:
+        if "|" in line:
             cells = [c.strip(" `*|") for c in line.split("|") if c.strip(" `*|")]
-            if cells:
+            if cells and not _HEX.fullmatch(cells[0].strip()):
                 name = cells[0]
+        if not name:
+            mtok = re.search(r"--(?:color-)?([a-zA-Z][\w-]*)", line)
+            if mtok:
+                name = mtok.group(1)
         for i, h in enumerate(hexes):
             base = _slug(name or f"color{len(colors)}") or f"color{len(colors)}"
             key = base if i == 0 else f"{base}-{i + 1}"
