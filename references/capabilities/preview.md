@@ -106,6 +106,36 @@ content to the bar in `references/design-philosophy.md`.
 4. Iterate (new versioned file) or advance. When leaving the browser, push a
    `waiting.html` ("Continuing in terminal…") so stale content isn't left up.
 
+## When the app can't run standalone (needs a backend / env / integrations)
+
+Rendering needs a page that actually renders. Many real apps don't — they need a
+backend, a database, API keys, auth, or build-time env you can't provision. **Do
+not** silently screenshot a broken/empty/error page and treat it as the design.
+Be honest and fall back, in this order:
+
+1. **Render the component in isolation (preferred).** You almost never need the
+   real backend to evaluate UI. Mount just the target component in a standalone
+   single-file HTML harness (inline React/Babel or the framework via CDN), feed it
+   **mock data** from `seed_content.py` (incl. the empty/loading/error/long-text
+   states), and preview/screenshot THAT. This is how you review a `<Dashboard>`
+   without its API — and it's the honest, useful path.
+2. **Have the user run it, then point at the URL.** If atelier can't (or shouldn't)
+   stand up the app, ASK the user to run it themselves and paste the **URL** — or to
+   just confirm it's already up on a port/URL you can reach (e.g. `localhost:3000`).
+   Then aim `screenshot.mjs` / `responsive_check.mjs` / the preview at that URL. Or
+   have them drop a **screenshot** and use `import_reference.py --image`. (Suggest
+   the exact run command if you can infer it, e.g. `npm run dev`.)
+3. **Static, render-free work.** Everything that doesn't need a live page still
+   works: the DESIGN.md contract, `lint_design` / `audit_contrast` / `slop_check`
+   on the source, component generation, the style guide. Say plainly: "I can't run
+   the full app (it needs <backend/env>), so I reviewed the component in isolation
+   / worked from source — give me a running URL for a full-page pass."
+
+**Detect it early:** if there's no static build (`dist/`/`out/`/`build/`) and the
+app has API routes / server code / a DB / required env, assume it won't render
+standalone and go straight to component isolation rather than wrestling a dev
+server. atelier's job is the frontend/design — it doesn't stand up your backend.
+
 ## Stop
 
 ```bash

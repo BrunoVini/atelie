@@ -8,7 +8,27 @@ huashu's screenshot-based expert review with the rigor of adversarial code revie
 this look right", or when you doubt your own output and want to QA before
 delivery.
 
-## 1. Capture — look before you judge
+## 0. Pick the evaluation mode (ask the user when it's not obvious)
+
+Two modes — confirm which the user wants before spending effort:
+
+- **Visual review (recommended for layout/look).** Screenshots at breakpoints,
+  then you *look*. Needs a renderable target. If atelier can't run the app
+  (backend/env/integrations), **ask the user to run it and paste the URL** — or to
+  just confirm it's already up on a port/URL you can reach — and point the capture
+  at that. If they can't run it either, review the component in isolation with mock
+  data (`preview.md` → "When the app can't run standalone").
+- **Non-visual review (faster, more limited).** Static, from the source + the
+  contract — `lint_design` / `audit_contrast` / `slop_check` / structure. No
+  rendering, so it CANNOT judge actual rendered hierarchy, spacing, or overflow;
+  say so. Good when the user only wants a code/contract check, or rendering is
+  impossible.
+
+A "review this screen" usually means visual; "check this for issues" may not. When
+in doubt, ask: *"Visual review (I'll screenshot it — need it running or a URL) or
+a non-visual code/contract review?"*
+
+## 1. Capture — look before you judge (visual mode)
 
 Render the design to PNGs at real breakpoints and **view them** (don't review
 from source alone — you miss spacing, hierarchy, and overflow that only show
@@ -20,7 +40,10 @@ node scripts/screenshot.mjs <page.html|url> /tmp/review-mobile.png 390 844 --ful
 ```
 
 Then Read both images. If no headless browser is installed, the script says so;
-fall back to reviewing the served preview (`preview.md`) or the source.
+fall back to reviewing the served preview (`preview.md`) or the source. **If the
+app can't render standalone (needs a backend/env)**, don't screenshot a broken
+page — review the component in isolation with mock data, or use a URL the user
+provides (see preview.md → "When the app can't run standalone").
 
 ## 2. Score — five dimensions, 0–10 each
 

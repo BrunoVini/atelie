@@ -61,7 +61,9 @@ node scripts/responsive_check.mjs <page.html|url>
 ```
 Run it before delivery (and in review). Fix every width that reports overflow
 before calling it done. Pair with `diff_screens.mjs` to confirm a fix at one width
-didn't regress another.
+didn't regress another. **Needs a renderable target** — for a backend-dependent app
+that won't run standalone, sweep the component in isolation or a user-provided URL
+(see preview.md → "When the app can't run standalone").
 
 ## Accessibility ties
 
