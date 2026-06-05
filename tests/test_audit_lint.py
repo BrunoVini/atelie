@@ -113,6 +113,20 @@ def test_audit_enforces_on_pairs_precisely():
     assert any(r["text"] == "on-muted" and r["surface"] == "muted" for r in fails)
 
 
+def test_prose_forbidden_colors_dont_leak_and_on_excluded_from_lint(tmp_path):
+    from contract import resolve_contract
+    from lint_design import _load_contract
+    (tmp_path / "DESIGN.md").write_text(
+        "## 2. Palette\n| background | `#faf7ee` | ink `#1a1a1a` |\n"
+        "## 6. Anti-slop\n- Never reintroduce `#d63333` for text; never `#ffffff` bg.\n")
+    c = resolve_contract(str(tmp_path))
+    vals = {v.lower() for v in c["colors"].values()}
+    assert "#d63333" not in vals and "#ffffff" not in vals          # prose hexes don't leak
+    assert c["colors"].get("on-background") == "#1a1a1a"             # but the on-pair is kept
+    colors_by_hex, _, _ = _load_contract(str(tmp_path))
+    assert not any(n.startswith("on-") for n in colors_by_hex.values())  # on-* not a lint target
+
+
 def test_strip_does_not_treat_hash_as_comment():  # regression: bug 7
     from check_rules import _strip
     assert "#flyout" in _strip("#flyout { } .modal {}")

@@ -30,6 +30,11 @@ def _load_contract(target):
     c = resolve_contract(target)
     colors = {}
     for name, v in c["colors"].items():  # first token wins -> deterministic
+        # `on-<role>` keys are text-on-surface PAIRING aliases for the contrast
+        # audit — not standalone tokens you'd apply, so don't offer them as lint
+        # suggestion targets (avoids suggesting nonexistent `--color-on-*`).
+        if name.startswith("on-"):
+            continue
         if isinstance(v, str) and v.startswith("#") and v.lower() not in colors:
             colors[v.lower()] = name
     return colors, set(c["fonts"]), set(c["spacing"])
@@ -73,7 +78,7 @@ def lint_repo(root, contract_path):
                     name, d = _nearest_token(rgb, colors)
                     if d > DELTA_E:
                         if name and d <= 40:
-                            fix = f"use var(--color-{name}) (nearest token)"
+                            fix = f"map to the nearest contract color '{name}' (use its token)"
                         else:
                             fix = "off-palette — pick a contract color or justify"
                         findings.append({
@@ -87,7 +92,7 @@ def lint_repo(root, contract_path):
                         continue
                     name, d = _nearest_token(_hex_to_rgb(hexv), colors)
                     if d > DELTA_E:
-                        fix = (f"use var(--color-{name}) (nearest token)"
+                        fix = (f"map to the nearest contract color '{name}' (use its token)"
                                if name and d <= 40 else "off-palette — pick a contract color")
                         findings.append({
                             "file": rel, "line": i, "kind": "color",

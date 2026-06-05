@@ -62,6 +62,12 @@ def _from_design_md(path):
         if not hexes:
             continue
         is_table = "|" in line
+        # Only harvest from a palette TABLE row or a `key: #hex` definition. Prose
+        # like "never reintroduce `#d63333`" or "Never `#ffffff`" has a hex but no
+        # `:`-before-hex — skip it, so forbidden/example colors don't leak into the
+        # allowed palette.
+        if not is_table and not re.search(r":\s*[`'\"]?#[0-9a-fA-F]", line):
+            continue
         name = None
         if is_table:
             cells = [c.strip(" `*|") for c in line.split("|") if c.strip(" `*|")]
