@@ -44,14 +44,17 @@ def _recommend_palette(colors):
 def assess(report, survey=None):
     dims = {}
 
-    # Palette: healthy = a few reused colors; messy = a long tail of one-offs.
+    # Palette: judge by INTENT, not raw count. Many colors that are mostly REUSED
+    # = an intentional (if rich) palette, not mess. Messy = a long tail of one-offs
+    # with no reuse (the "everyone picked their own hex" smell).
     colors = report.get("colors", [])
     reused = [c for c in colors if c["count"] >= 2]
     oneoffs = [c for c in colors if c["count"] < 2]
     n = len(colors)
-    if n <= 10 and len(oneoffs) <= 6:
+    one_off_ratio = (len(oneoffs) / n) if n else 0
+    if n <= 8 or one_off_ratio <= 0.25:
         plevel = "clean"
-    elif n <= 20:
+    elif n <= 20 or one_off_ratio <= 0.4:
         plevel = "minor"
     else:
         plevel = "messy"
@@ -59,7 +62,7 @@ def assess(report, survey=None):
         "level": plevel, "distinct": n, "reused": len(reused), "one_offs": len(oneoffs),
         "recommend": _recommend_palette(colors),
         "options": [c["hex"] for c in colors[:12]],
-        "note": f"{n} distinct colors ({len(reused)} reused, {len(oneoffs)} one-offs)",
+        "note": f"{n} distinct colors, {len(oneoffs)} one-offs ({one_off_ratio:.0%})",
     }
 
     # Typography.
@@ -71,13 +74,15 @@ def assess(report, survey=None):
         "note": f"{len(fonts)} font families" + (" — pick a display + body" if len(fonts) > 3 else ""),
     }
 
-    # Spacing scale.
+    # Spacing scale. Many values are common (decorative offsets, sub-pixel borders,
+    # fluid clamps) and rarely worth blocking generation over — so spacing caps at
+    # "minor". Recommend a clean subset as the canonical scale.
     sp = report.get("spacing", [])
-    slevel = "clean" if len(sp) <= 10 else ("minor" if len(sp) <= 16 else "messy")
+    slevel = "clean" if len(sp) <= 12 else "minor"
     dims["spacing"] = {
         "level": slevel, "distinct": len(sp),
         "recommend": sp[:8], "options": sp,
-        "note": f"{len(sp)} spacing values" + (" — no clear scale" if slevel == "messy" else ""),
+        "note": f"{len(sp)} spacing values" + (" — pick a canonical subset" if slevel == "minor" else ""),
     }
 
     # Styling approach + component duplicates (need the survey).
