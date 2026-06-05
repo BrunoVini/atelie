@@ -12,6 +12,7 @@
  * Exits non-zero if any width overflows. Degrades gracefully without a browser.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -25,20 +26,9 @@ const WIDTHS = (wi !== -1 ? process.argv[wi + 1] : '360,768,834,1024,1280,1440,1
   .split(',').map(n => parseInt(n, 10)).filter(Boolean);
 const url = /^https?:\/\//.test(input) ? input : 'file://' + path.resolve(input);
 const slug = path.basename(input).replace(/\W+/g, '_');
-const outDir = path.resolve('.atelier-responsive');
+// Scratch artifacts go to the OS tmp dir — never into the user's repo.
+const outDir = path.join(os.tmpdir(), 'atelier-responsive', slug);
 fs.mkdirSync(outDir, { recursive: true });
-ensureGitignored('.atelier-*/');
-
-// Keep atelier scratch dirs out of the user's commits.
-function ensureGitignored(pattern) {
-  try {
-    const gi = path.resolve('.gitignore');
-    const cur = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf-8') : '';
-    if (!cur.split(/\r?\n/).includes(pattern)) {
-      fs.appendFileSync(gi, (cur && !cur.endsWith('\n') ? '\n' : '') + pattern + '\n');
-    }
-  } catch { /* best-effort */ }
-}
 
 async function launch() {
   try {
@@ -91,7 +81,10 @@ try {
   let anyOverflow = false;
   for (const width of WIDTHS) {
     const page = await mk({ width, height: 900 });
-    await page.goto(url, { waitUntil: 'load' });
+    await page.goto(url, { waitUntil: 'networkidle' });
+    // Wait for web fonts so the capture reflects the real page, not a fallback-font
+    // "raw HTML" render (mirrors huashu's verification discipline).
+    await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
     const probe = await page.evaluate(PROBE);
     const png = path.join(outDir, `${slug}-${width}.png`);
     await page.screenshot({ path: png, fullPage: true });

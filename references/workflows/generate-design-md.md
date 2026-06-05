@@ -21,6 +21,32 @@ candidates and the referenced fonts as the existing type choices. Use the
 breakpoints + framework to fill §4's **target surfaces** (responsive / pc-only /
 mobile-only) and fluid strategy — ask the user the target if it's ambiguous.
 
+### 1b. Assess consistency — DON'T write a confident contract for a messy repo
+
+```bash
+python3 scripts/assess.py /path/to/repo            # clean | minor | messy, per dimension
+```
+
+Be honest, and scale the response to the inconsistency level:
+
+- **clean / minor** → auto-pick the recommended dominant pattern (assess gives a
+  `recommend` per dimension) and write the DESIGN.md. State the variance honestly
+  ("measured 14 colors; consolidated to a 5-role palette around the dominant ones").
+- **messy** (assess `needs_user_input: true`) → STOP. Tell the user *which*
+  dimensions are inconsistent and why (e.g. "23 colors with no dominant set",
+  "mixed Tailwind + styled-components", "3 duplicate Button components"). For each
+  messy dimension, present the **best options with atelier's pick pre-selected**
+  (use the multiple-choice question tool), let the user choose, then write the
+  DESIGN.md from their choices. Never silently invent a contract over chaos.
+
+### 1c. Offer to standardize — only when the inconsistency would cause problems
+
+After writing the DESIGN.md, if the repo was **messy** in a way that will bite
+(off-contract colors everywhere, duplicate components, mixed approaches), OFFER —
+don't force — a standardization pass grounded in the new contract:
+`migrate_to_tokens.py` for hardcoded values, a component-dedupe plan from the
+census, and `check.py` to verify. If the repo was clean/minor, skip this.
+
 ### 2. Classify the product type
 
 From `package.json`, `README`, route/page names, and on-screen copy, infer the

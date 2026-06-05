@@ -30,6 +30,24 @@ def test_audit_enforces_on_token_against_its_base():
     assert row["informational"] is False  # on-primary on primary IS enforced
 
 
+def test_assess_consistency_levels():
+    from assess import assess
+    clean = {"colors": [{"hex": "#2563eb", "count": 9}, {"hex": "#ea580c", "count": 4},
+                        {"hex": "#f8fafc", "count": 6}, {"hex": "#1e293b", "count": 8}],
+             "fonts": ["Sora", "Inter"], "spacing": ["4px", "8px", "16px", "24px"]}
+    a = assess(clean)
+    assert a["level"] == "clean" and a["needs_user_input"] is False
+    assert a["dimensions"]["palette"]["recommend"]  # picked roles
+
+    messy = {"colors": [{"hex": "#%06x" % (i * 4096), "count": 1} for i in range(25)],
+             "fonts": ["A", "B", "C", "D", "E", "F"],
+             "spacing": [f"{n}px" for n in range(1, 22)]}
+    m = assess(messy, survey={"styling": ["tailwind", "css-in-js"],
+                              "duplicate_components": {"Button": ["a", "b"]}})
+    assert m["level"] == "messy" and m["needs_user_input"] is True
+    assert "palette" in m["messy_dimensions"] and "styling" in m["messy_dimensions"]
+
+
 def test_contract_resolves_from_design_md(tmp_path):
     from contract import resolve_contract
     (tmp_path / "DESIGN.md").write_text(

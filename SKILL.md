@@ -50,6 +50,11 @@ with `scripts/scan_repo.py` and obey it. If no contract exists, OFFER to generat
 one before generating polished output — do not silently default to Inter +
 purple gradient. This applies no matter how "quick" the request seems.
 
+When generating a DESIGN.md, first ASSESS consistency (`scripts/assess.py`). If the
+repo is **messy** (no dominant palette, mixed styling, duplicate components), do
+NOT write a confident contract — warn the user honestly, present the best options
+pre-selected, let them choose, then write. Auto-pick only when it's clean/minor.
+
 Also OBEY the project's own rules in `DESIGN.md` when present: the **house rules**
 (§9 — e.g. "use a modal, never a flyout"), the **component standards** (§7), and
 the **data/chart standards** (§8) are LAW for this repo and OVERRIDE atelier's
@@ -65,6 +70,7 @@ flags violations.
 | Plan a robust / multi-surface design effort (multi-page, redesign, rollout) | `references/workflows/design-plan.md` | contract + council |
 | Write real UI code into an existing repo (fit its frontend architecture) | `references/workflows/architecture-fit.md` | `scripts/survey_repo.py` |
 | A DESIGN.md / design system / "map our design" | `references/workflows/generate-design-md.md` | `scripts/scan_repo.py`, `scripts/export_tokens.py` |
+| Is the repo too inconsistent to auto-generate a contract? | `references/workflows/generate-design-md.md` | `scripts/assess.py` |
 | "Make it like this" / import a reference / cold start | `references/workflows/generate-design-md.md` | `scripts/import_reference.py` |
 | Realistic content / fill a mockup / test empty·loading states | `references/capabilities/content.md` | `scripts/seed_content.py` |
 | A live preview / demo / "show me" / pick between options | `references/capabilities/preview.md` | `scripts/preview/start.sh` |
