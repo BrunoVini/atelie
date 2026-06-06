@@ -106,6 +106,34 @@ content to the bar in `references/design-philosophy.md`.
 4. Iterate (new versioned file) or advance. When leaving the browser, push a
    `waiting.html` ("Continuing in terminal…") so stale content isn't left up.
 
+## Live element iteration (view → edit → accept into source)
+
+Beyond *viewing*, the preview can drive an **edit** loop on a real element — and
+because atelier holds the contract explicitly, the variants it offers stay on-brand
+(it doesn't have to re-guess the design every session).
+
+1. **Pick** an element in the preview (click-to-select already wires `data-choice`).
+2. **Propose** 3 contract-constrained variants with `scripts/edit_apply.py`
+   `propose_variants(current_styles, contract)` — each uses ONLY contract tokens
+   (a quieter/bolder/flatter take), so a tweak can't drift off-contract.
+   `variants_are_on_contract()` is the guard that proves it.
+3. **Tweak live** with CSS-variable knobs (the preview re-themes via `/design/tokens.css`),
+   staying within the token scale.
+4. **Accept into source** — POST to the server:
+   ```
+   POST /edit/apply   { "file": "<abs path inside the project>", "old": "<exact snippet>", "new": "<replacement>" }
+   POST /edit/revert  { "journal_id": "<id from apply>" }
+   ```
+   This is **safe by construction**: the server confines edits to the project dir,
+   and `edit_apply.py` refuses generated/minified/vendored files, requires the
+   `old` snippet to be **unique**, and **journals a backup before writing** so any
+   accept is one `revert` away. Nothing is committed — you show the diff and let the
+   user decide.
+
+This is atelier doing live iteration *better* than tools that re-extract every
+session: the variants are bounded by the explicit contract, and the write path is
+guarded + reversible.
+
 ## When the app can't run standalone (needs a backend / env / integrations)
 
 Rendering needs a page that actually renders. **First, check whether it's already

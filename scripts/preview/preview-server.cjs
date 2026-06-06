@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 
 // ========== WebSocket Protocol (RFC 6455) ==========
 
@@ -173,6 +174,38 @@ function handleRequest(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
     res.end(fs.readFileSync(filePath));
+  } else if (req.method === 'POST' && req.url.startsWith('/edit/')) {
+    // Live element iteration: accept an edit back into source, or revert one. The
+    // heavy guards live in scripts/edit_apply.py (generated-file refusal, unique
+    // anchor, journaled undo); here we ALSO confine writes to inside the project.
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', () => {
+      let payload;
+      try { payload = JSON.parse(body || '{}'); }
+      catch { res.writeHead(400); return res.end(JSON.stringify({ ok: false, reason: 'bad json' })); }
+      const editScript = path.join(path.resolve(__dirname, '..'), 'edit_apply.py');
+      const journalDir = path.join(SESSION_DIR, 'edit-journal');
+      let args;
+      if (req.url === '/edit/apply') {
+        const target = path.resolve(payload.file || '');
+        if (!PROJECT_DIR || !target.startsWith(path.resolve(PROJECT_DIR) + path.sep)) {
+          res.writeHead(403);
+          return res.end(JSON.stringify({ ok: false, reason: 'edits are confined to the project dir' }));
+        }
+        args = ['apply', target, journalDir, '--old', String(payload.old || ''), '--new', String(payload.new || '')];
+      } else if (req.url === '/edit/revert') {
+        args = ['revert', journalDir, String(payload.journal_id || '')];
+      } else {
+        res.writeHead(404);
+        return res.end(JSON.stringify({ ok: false, reason: 'unknown edit route' }));
+      }
+      execFile('python3', [editScript, ...args], { timeout: 15000 }, (err, stdout, stderr) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end((stdout && stdout.trim())
+          || JSON.stringify({ ok: false, reason: (stderr || String(err || 'edit failed')).trim() }));
+      });
+    });
   } else {
     res.writeHead(404);
     res.end('Not found');

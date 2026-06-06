@@ -96,6 +96,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Write real UI code into an existing repo | `references/workflows/architecture-fit.md` | `survey_repo.py`, `census.py` |
 | A hi-fi prototype / app mockup / device frame | `references/capabilities/prototypes.md` | `assets/frames/*.jsx` |
 | A live preview / demo / "show me" / pick between options | `references/capabilities/preview.md` | `scripts/preview/start.sh` |
+| Iterate live on an element (pick → contract-bound variants → accept into source) | `references/capabilities/preview.md` | `scripts/edit_apply.py` |
 | 2-3 design directions to choose from | `references/capabilities/variants.md` | `assets/engines/canvas.jsx` |
 | A hard call / "weigh the options" / decide a direction | `references/capabilities/council.md` | (5-agent council) |
 | Slides / a deck / presentation | `references/capabilities/slides.md` | `assets/engines/deck.js` |

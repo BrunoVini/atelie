@@ -131,6 +131,39 @@ def test_scan_depth_strategy_and_known_gaps(tmp_path):
     assert any("shadow" in g.lower() or "elevation" in g.lower() for g in rep["known_gaps"])
 
 
+def test_edit_variants_stay_on_contract():
+    from edit_apply import propose_variants, variants_are_on_contract
+    contract = {"colors": {"background": "#ffffff", "surface": "#f1f5f9",
+                           "accent": "#2563eb", "border": "#e2e8f0"},
+                "radius": ["4px", "8px", "16px"], "spacing": ["8px", "16px", "24px"]}
+    current = {"background": "#ffffff", "border-radius": "8px", "padding": "16px",
+               "box-shadow": "0 4px 12px rgba(0,0,0,.1)"}
+    variants = propose_variants(current, contract)
+    assert 1 <= len(variants) <= 3
+    assert variants_are_on_contract(variants, contract) == []   # never drifts off-contract
+
+
+def test_edit_apply_guards_journals_and_reverts(tmp_path):
+    from edit_apply import apply_edit, revert, is_generated
+    jdir = str(tmp_path / "journal")
+    f = tmp_path / "Card.css"
+    f.write_text(".card{border-radius:8px}")
+    res = apply_edit(str(f), "border-radius:8px", "border-radius:16px", jdir, now=1.0)
+    assert res["ok"] and "border-radius:16px" in f.read_text()
+    # revert restores the original byte-for-byte
+    assert revert(jdir, res["journal_id"])["ok"]
+    assert f.read_text() == ".card{border-radius:8px}"
+    # refuses a non-unique anchor
+    f.write_text(".a{color:red}.b{color:red}")
+    assert apply_edit(str(f), "color:red", "color:blue", jdir, now=2.0)["ok"] is False
+    # refuses a generated/vendored file
+    gen = tmp_path / "node_modules" / "x.css"
+    gen.parent.mkdir()
+    gen.write_text(".x{color:red}")
+    assert apply_edit(str(gen), "color:red", "color:blue", jdir, now=3.0)["ok"] is False
+    assert is_generated(str(gen))
+
+
 def test_import_reference_url_crawler_parses_html_and_css():
     from import_reference import styles_from_blob
     html = ('<html><head><style>body{color:#2563eb;font-family:Inter,sans-serif}'

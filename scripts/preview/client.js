@@ -84,5 +84,17 @@
     choice: (value, metadata = {}) => sendEvent({ type: 'choice', value, ...metadata })
   };
 
+  // Live element iteration (view -> edit). Accept a tweak back into source, or undo
+  // it. The server confines edits to the project dir and edit_apply.py journals a
+  // backup before writing, so apply is always reversible (capabilities/preview.md).
+  window.atelier = {
+    applyEdit: (file, oldSnippet, newSnippet) =>
+      fetch('/edit/apply', { method: 'POST',
+        body: JSON.stringify({ file: file, old: oldSnippet, new: newSnippet }) }).then(r => r.json()),
+    revertEdit: (journalId) =>
+      fetch('/edit/revert', { method: 'POST',
+        body: JSON.stringify({ journal_id: journalId }) }).then(r => r.json())
+  };
+
   connect();
 })();
