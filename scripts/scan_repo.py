@@ -329,6 +329,40 @@ def infer_depth_strategy(shadows, surface_count=0):
     return "layered-shadow"
 
 
+# --- gradients / z-index / motion (transition + easing) ----------------------
+_GRADIENT = re.compile(r"(?:repeating-)?(?:linear|radial|conic)-gradient\([^;{}]*\)", re.I)
+_ZINDEX = re.compile(r"z-index\s*:\s*(-?\d+)", re.I)
+_TRANSITION = re.compile(r"(?:transition|animation)(?:-duration)?\s*:\s*([^;{}]+)", re.I)
+_DURATION = re.compile(r"(?<![\w.])([\d.]+)(ms|s)\b", re.I)
+_EASING = re.compile(
+    r"cubic-bezier\([^)]*\)|steps\([^)]*\)|ease-in-out|ease-in|ease-out|linear|\bease\b", re.I)
+
+
+def extract_gradients(text):
+    """Distinct gradient declarations actually used, most-common first."""
+    counter = Counter(re.sub(r"\s+", " ", g.strip()) for g in _GRADIENT.findall(text))
+    return [g for g, _ in counter.most_common()]
+
+
+def extract_z_indexes(text):
+    """The z-index values in use, ascending — the repo's real stacking scale."""
+    return sorted({int(z) for z in _ZINDEX.findall(text)})
+
+
+def extract_motion(text):
+    """Transition/animation timing actually used: {durations:[...], easings:[...]}."""
+    durations, easings = Counter(), Counter()
+    for decl in _TRANSITION.findall(text):
+        for num, unit in _DURATION.findall(decl):
+            if num.startswith("."):
+                num = "0" + num                 # .3s -> 0.3s
+            durations[f"{num}{unit}"] += 1
+        for e in _EASING.findall(decl):
+            easings[re.sub(r"\s+", "", e.lower())] += 1
+    return {"durations": [d for d, _ in durations.most_common()],
+            "easings": [e for e, _ in easings.most_common()]}
+
+
 # --- dark mode ---------------------------------------------------------------
 _DARK = re.compile(
     r"prefers-color-scheme\s*:\s*dark|\[data-theme=[\"']?dark|\.dark\b|"
@@ -644,6 +678,9 @@ def scan_directory(root):
         "breakpoints": breakpoints,
         "shadows": shadows,
         "depth_strategy": infer_depth_strategy(shadows),
+        "gradients": extract_gradients(style_blob + "\n" + code_blob),
+        "z_indexes": extract_z_indexes(style_blob + "\n" + code_blob),
+        "motion": extract_motion(style_blob + "\n" + code_blob),
         "dark_mode": detect_dark_mode(style_blob + "\n" + code_blob),
     }
     report["known_gaps"] = known_gaps(report)

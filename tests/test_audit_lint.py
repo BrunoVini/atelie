@@ -131,6 +131,18 @@ def test_scan_depth_strategy_and_known_gaps(tmp_path):
     assert any("shadow" in g.lower() or "elevation" in g.lower() for g in rep["known_gaps"])
 
 
+def test_scan_extracts_gradients_zindex_and_motion():
+    from scan_repo import extract_gradients, extract_z_indexes, extract_motion
+    css = (".hero{background:linear-gradient(135deg,#fff,#000)}"
+           ".modal{z-index:50}.tip{z-index:1000}"
+           ".btn{transition:transform 200ms ease-in-out, opacity .3s ease}")
+    assert any("linear-gradient" in g for g in extract_gradients(css))
+    assert extract_z_indexes(css) == [50, 1000]
+    motion = extract_motion(css)
+    assert "200ms" in motion["durations"] and "0.3s" in motion["durations"]
+    assert "ease-in-out" in motion["easings"]
+
+
 def test_contract_parses_depth_and_resolves_references(tmp_path):
     from contract import resolve_contract, unresolved_references
     (tmp_path / "DESIGN.md").write_text(
