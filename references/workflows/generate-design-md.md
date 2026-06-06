@@ -47,6 +47,26 @@ don't force — a standardization pass grounded in the new contract:
 `migrate_to_tokens.py` for hardcoded values, a component-dedupe plan from the
 census, and `check.py` to verify. If the repo was clean/minor, skip this.
 
+### 1d. Hunt overlaps across screen sizes (default — don't wait to be asked)
+
+Scanning a repo includes checking for element overlaps/collisions across widths —
+it's part of the scan, not a separate request. Overlaps surface in the **tablet
+mid-range** (≈760–1100px), so endpoint-only looks miss them.
+
+```bash
+node scripts/responsive_check.mjs <running-url-or-html>   # if it can render: overflow + collision + deco-over-text
+python3 scripts/overlap_risk.py /path/to/repo             # always: static risk patterns (no render needed)
+```
+
+- **If you can render** (a server is up, or you start one on a free port —
+  `review.md` NEVER-COLLIDE), sweep widths: confirmed collisions and
+  decoration-over-text candidates come back per width.
+- **If you can't render**, run `overlap_risk.py` — it flags absolutely-positioned
+  decorations with %-offsets, negative margins, and decoration clusters (the exact
+  pattern that drifts onto content mid-range), as risks to verify.
+- Report findings with the scan; record unresolved ones under DESIGN.md §12 (Known
+  gaps). Fix the **cause**, then re-verify across the whole sweep (`review.md` §3c).
+
 ### 2. Classify the product type
 
 From `package.json`, `README`, route/page names, and on-screen copy, infer the

@@ -40,10 +40,13 @@ Two modes — confirm which the user wants before spending effort:
   isolated instance.
   </NEVER-COLLIDE>
 - **Non-visual review (faster, more limited).** Static, from the source + the
-  contract — `lint_design` / `audit_contrast` / `slop_check` / structure. No
-  rendering, so it CANNOT judge actual rendered hierarchy, spacing, or overflow;
-  say so. Good when the user only wants a code/contract check, or rendering is
-  impossible.
+  contract — `lint_design` / `audit_contrast` / `slop_check` / `overlap_risk` /
+  structure. No rendering, so it CANNOT confirm rendered hierarchy, spacing, or an
+  actual collision — but it is NOT blind to overlaps: `overlap_risk.py` flags the
+  *patterns* that cause them (absolutely-positioned decorations with %-offsets that
+  drift in the mid-range, negative margins, decoration clusters). Report those as
+  risks to verify, and say a render is needed to confirm. Good when the user only
+  wants a code/contract check, or rendering is impossible.
 
 A "review this screen" usually means visual; "check this for issues" may not. When
 in doubt, ask: *"Visual review (I'll screenshot it — need it running or a URL) or
@@ -65,6 +68,18 @@ fall back to reviewing the served preview (`preview.md`) or the source. **If the
 app can't render standalone (needs a backend/env)**, don't screenshot a broken
 page — review the component in isolation with mock data, or use a URL the user
 provides (see preview.md → "When the app can't run standalone").
+
+**Sweep for overlaps BY DEFAULT — don't wait to be asked.** Any visual review or
+repo scan runs the width sweep automatically; overlaps and collisions only appear
+*between* the endpoints (the tablet mid-range), so a 1440+390 spot-check misses them:
+
+```bash
+node scripts/responsive_check.mjs <page.html|url>   # overflow + text collision + deco-over-text
+```
+It now also flags **decoration-over-text** (a doodle/badge sitting on copy) as a
+candidate — judge each: a layered collage can be intentional, but a decoration
+drifting onto text in the mid-range is a bug (fix per §3c). When you CAN'T render,
+run `overlap_risk.py` instead (static risk patterns — see the non-visual mode above).
 
 ## 2. Score — five dimensions, 0–10 each
 

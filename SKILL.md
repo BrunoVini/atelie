@@ -109,6 +109,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Audit accessibility / contrast against the palette | `references/capabilities/review.md` | `audit_contrast.py` |
 | Verify output isn't generic AI slop | `references/capabilities/review.md` | `slop_check.py` |
 | Verify a change didn't regress (visual diff) | `references/capabilities/review.md` | `diff_screens.mjs` |
+| Hunt overlaps/collisions across screen sizes (default in any scan/review) | `references/capabilities/review.md` | `responsive_check.mjs`, `overlap_risk.py` |
 | A performance / weight budget for a page | `references/capabilities/review.md` | `perf_budget.py` |
 | Check the repo doesn't drift from DESIGN.md (design lint) | `references/workflows/enforce-coherence.md` | `lint_design.py` |
 | Enforce project house rules ("no flyouts, only modals") | `references/workflows/enforce-coherence.md` | `check_rules.py` |

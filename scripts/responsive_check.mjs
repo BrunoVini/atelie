@@ -82,7 +82,26 @@ const PROBE = `(() => {
     if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
     leaves.push({ el, r, sel: selOf(el) });
   }
-  const overlaps = [];
+  // Decorations: positioned (absolute/fixed) or svg/img elements with NO own text.
+  // A decoration sitting on top of text (e.g. a doodle peeking around a note) is the
+  // case text-vs-text misses — surface it as advisory (collages are legitimate).
+  const decos = [];
+  for (const el of document.querySelectorAll('body *')) {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'style') continue;
+    let direct = '';
+    for (const n of el.childNodes) if (n.nodeType === 3) direct += n.textContent;
+    if (direct.trim()) continue;                        // has its own text -> it's a leaf, not deco
+    const cs = getComputedStyle(el);
+    const positioned = cs.position === 'absolute' || cs.position === 'fixed';
+    if (!positioned && tag !== 'svg' && tag !== 'img') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) continue;
+    if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+    decos.push({ el, r, sel: selOf(el) });
+  }
+
+  const overlaps = [], decoOverlaps = [];
   if (leaves.length <= 400) {                           // O(n^2) guard for huge pages
     for (let i = 0; i < leaves.length; i++) {
       for (let j = i + 1; j < leaves.length; j++) {
@@ -98,10 +117,25 @@ const PROBE = `(() => {
       }
     }
     overlaps.sort((x,y) => y.pct - x.pct);
+    // decoration-over-text: overlap measured against the TEXT box (what must stay legible)
+    if (decos.length <= 200) {
+      for (const t of leaves) {
+        for (const d of decos) {
+          if (t.el.contains(d.el) || d.el.contains(t.el)) continue;
+          const ix = Math.min(t.r.right, d.r.right) - Math.max(t.r.left, d.r.left);
+          const iy = Math.min(t.r.bottom, d.r.bottom) - Math.max(t.r.top, d.r.top);
+          if (ix <= 1 || iy <= 1) continue;
+          const pct = Math.round((ix * iy) / (t.r.width * t.r.height) * 100);
+          if (pct >= 35) decoOverlaps.push({ text: t.sel, deco: d.sel, pct });
+        }
+      }
+      decoOverlaps.sort((x,y) => y.pct - x.pct);
+    }
   }
   const severeOverlap = overlaps.some(o => o.pct >= 60);
   return { vw, docW, overflow: docW > vw + 1, offenders: offenders.slice(0, 6),
-           overlaps: overlaps.slice(0, 6), severeOverlap };
+           overlaps: overlaps.slice(0, 6), severeOverlap,
+           decoOverlaps: decoOverlaps.slice(0, 6) };
 })()`;
 
 function contactSheet(rows) {
@@ -115,19 +149,20 @@ function contactSheet(rows) {
       <img src="${path.basename(r.png)}" style="width:${Math.min(r.width, 480)}px">
       ${r.offenders?.length ? '<ul class="of">' + r.offenders.map(o => `<li>overflow: ${o.sel} — ${o.w}px</li>`).join('') + '</ul>' : ''}
       ${r.overlaps?.length ? '<ul class="ov">' + r.overlaps.map(o => `<li>overlap ${o.pct}%: ${o.a} ↔ ${o.b}</li>`).join('') + '</ul>' : ''}
+      ${r.decoOverlaps?.length ? '<ul class="dv">' + r.decoOverlaps.map(o => `<li>verify: ${o.deco} on text ${o.text} (${o.pct}%)</li>`).join('') + '</ul>' : ''}
     </figure>`;
   }).join('');
   return `<!DOCTYPE html><meta charset="utf-8"><title>atelier — responsive sweep</title>
 <style>body{font-family:ui-serif,Georgia,serif;margin:0 auto;max-width:1100px;padding:32px}
 figure{margin:0 0 28px;border:1px solid #0002;padding:12px}figcaption{font-weight:600;margin-bottom:8px}
-img{display:block;border:1px solid #0001}ul{font:13px/1.5 monospace}ul.of{color:#b00}ul.ov{color:#a60}</style>
+img{display:block;border:1px solid #0001}ul{font:13px/1.5 monospace}ul.of{color:#b00}ul.ov{color:#a60}ul.dv{color:#789}</style>
 <h1>Responsive sweep — ${slug}</h1>${cells}`;
 }
 
 try {
   const { b, mk } = await launch();
   const rows = [];
-  let anyOverflow = false, anyCollision = false;
+  let anyOverflow = false, anyCollision = false, anyDeco = false;
   for (const width of WIDTHS) {
     const page = await mk({ width, height: 900 });
     await page.goto(url, { waitUntil: 'networkidle' });
@@ -140,6 +175,7 @@ try {
     await page.close();
     anyOverflow = anyOverflow || probe.overflow;
     anyCollision = anyCollision || probe.severeOverlap;
+    anyDeco = anyDeco || (probe.decoOverlaps && probe.decoOverlaps.length > 0);
     rows.push({ width, png, ...probe });
     const tags = [];
     if (probe.overflow) {
@@ -149,6 +185,10 @@ try {
     if (probe.overlaps.length) {
       tags.push(`⚠ COLLISION: ` +
         probe.overlaps.map(o => `${o.a}↔${o.b}(${o.pct}%)`).join(', '));
+    }
+    if (probe.decoOverlaps?.length) {
+      tags.push(`◦ verify deco-over-text: ` +
+        probe.decoOverlaps.map(o => `${o.deco} on ${o.text}(${o.pct}%)`).join(', '));
     }
     console.error(`  ${String(width).padStart(4)}px  ${tags.length ? tags.join('  ') : 'ok'}`);
   }
@@ -161,6 +201,10 @@ try {
     console.error(`✗ ${what} found — fix the flagged widths, then re-run to confirm the fix holds across the whole sweep.`);
   } else {
     console.error('✓ no horizontal overflow and no text collision across the sweep.');
+  }
+  if (anyDeco) {
+    console.error('◦ decoration-over-text candidates flagged — review each: a layered collage may '
+      + 'be intentional, but a doodle drifting onto copy in the mid-range is a bug. Look at the sheet.');
   }
   process.exit(anyOverflow || anyCollision ? 1 : 0);
 } catch (e) {

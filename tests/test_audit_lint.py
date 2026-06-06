@@ -179,6 +179,24 @@ def test_export_tokens_emits_depth_groups():
     assert "boxShadow" in preset["theme"]["extend"]
 
 
+def test_overlap_risk_flags_percent_positioned_decorations(tmp_path):
+    from overlap_risk import scan_repo_overlap_risk
+    (tmp_path / "Gear.astro").write_text(
+        "<div class='g'></div><style>.g{position:absolute;right:5%;bottom:18%}</style>")
+    (tmp_path / "ok.css").write_text(".x{display:flex;gap:1rem;padding:16px}")
+    findings = scan_repo_overlap_risk(str(tmp_path))
+    assert any(f["kind"] == "positioned-percent" for f in findings)
+    assert not any(f["file"] == "ok.css" for f in findings)   # a clean flex layout is no risk
+
+
+def test_overlap_risk_flags_negative_margin_and_cluster(tmp_path):
+    from overlap_risk import scan_file
+    assert any(f["kind"] == "negative-margin" for f in scan_file(".a{margin-top:-40px}", "a.css"))
+    cluster = "<style>" + "".join(
+        f".d{i}{{position:absolute;top:{i}0%;left:{i}0%}}" for i in range(1, 4)) + "</style>"
+    assert any(f["kind"] == "decoration-cluster" for f in scan_file(cluster, "Hero.astro"))
+
+
 def test_assess_consistency_levels():
     from assess import assess
     clean = {"colors": [{"hex": "#2563eb", "count": 9}, {"hex": "#ea580c", "count": 4},
