@@ -35,9 +35,20 @@ illustration" from "a few flat shapes":
   intersection (not dead center), and add a directional device — a winding path, a furrow, a
   river, a power-line run, a road — that routes the eye to it. A scene with no lead-line lets
   the gaze wander.
-- **Real depth via atmospheric perspective.** 4–6 receding planes; distant layers desaturate
-  + lighten toward the horizon (haze), nearer layers saturate + darken. Vary element sizes by
-  distance (big turbine near the focal point, tiny ghosted ones on far ridges).
+- **Real depth via atmospheric perspective — push it hard.** 4–6 receding planes with
+  *distinct value steps*. The farthest hills should go genuinely hazy: desaturate them toward
+  a lavender-grey, LIFT their value (lighter, lower-contrast), and let them sit *behind* the
+  focal light's air — not a saturated green ridge on the same plane as the midground. Nearer
+  layers saturate + darken. Vary element sizes by distance (big turbine near the focal point,
+  tiny ghosted ones on far ridges). A flat, equally-saturated set of hills is the #1 tell that
+  depth was faked; if the back ridge reads as "same paint, smaller", redo it hazier.
+- **Give the foreground a near-field hero anchor.** The closest row of repeated elements (the
+  front solar panels, the nearest tree) should jump in size and carry the strongest detail +
+  a real specular highlight — a clear near-field entry point for the eye, then recession behind.
+- **Balance mass around the off-center focal.** If the headline + the dense element field both
+  sit left, the right goes empty and the frame tips. Earn the off-center focal by placing one
+  mid-distance counterweight (a substation, a turbine cluster, a built element) on the lighter
+  side. Check the rendered composition for a lopsided frame.
 - **Repeated elements must READ at scale.** A solar field / crowd / forest can't be thin
   tilted dashes — that reads as "a field of commas." Draw each unit as a real dimensional
   object (a panel = framed module + glass face + cell grid + mount + cast shadow + one sky-
