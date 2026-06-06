@@ -9,6 +9,14 @@ animated SVG — bound to the `DESIGN.md` contract.
 ## What atelier does well with SVG
 - **Icons** — consistent stroke width, grid, and corner radius; one coherent set.
   Prefer a single style (outline OR filled), sized in `em` so they scale with text.
+  **QA the family by zooming in:** render the grid large and check every icon shares the
+  same optical weight, grid, and cap/join, and that each metaphor is unmistakable (a savings
+  icon must read as savings, not a chat bubble; a gear must read as settings, not a sun) —
+  redraw any outlier. Verify legibility at the smallest size you ship (16px). And **don't
+  overclaim in the showcase copy**: if the small sizes are just the master scaled down, don't
+  label them "optically hinted / drawn per size" — either actually hint each size, or describe
+  it honestly. Claiming a craft property you didn't implement is the same integrity miss as a
+  dead control (see landing-craft "finish interactions honestly").
 - **Decorative / geometric marks** — dividers, blobs, grain, marginalia, badges
   (the kind of hand-crafted decorative SVG a designer draws on purpose).
 - **Diagrams** — architecture/flow/relationship diagrams with clear hierarchy and
