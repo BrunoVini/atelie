@@ -48,7 +48,11 @@ def _from_tokens_json(path):
     for v in vals("font").values():
         fonts.extend(v if isinstance(v, list) else [v])
     spacing = [str(v) for v in vals("space").values()]
-    return {"source": path, "colors": colors, "fonts": fonts, "spacing": spacing}
+    depth = data.get("depth")
+    if not depth:
+        depth = (data.get("$extensions", {}) or {}).get("atelier", {}).get("depth")
+    return {"source": path, "colors": colors, "fonts": fonts, "spacing": spacing,
+            "depth": depth if isinstance(depth, str) else None}
 
 
 def _from_design_md(path):
@@ -105,7 +109,9 @@ def _from_design_md(path):
             fm = fm.strip()
             if fm and not fm.startswith("--") and fm.lower() not in _FONT_LABEL_DENY and fm not in fonts:
                 fonts.append(fm)
-    return {"source": path, "colors": colors, "fonts": fonts, "spacing": []}
+    mdep = re.search(r"depth strategy[^\n:=]*[:=]\s*\**\s*`?([a-z][a-z-]+)`?", text, re.I)
+    depth = mdep.group(1).lower() if mdep else None
+    return {"source": path, "colors": colors, "fonts": fonts, "spacing": [], "depth": depth}
 
 
 def resolve_contract(target):
@@ -133,6 +139,28 @@ def has_contract(target):
         return True
     except FileNotFoundError:
         return False
+
+
+# `{group.name}` token references in DESIGN.md prose bind the human half to the
+# token half so they can't drift. Lint that every reference resolves.
+_REF = re.compile(r"\{([a-z]+)\.([a-zA-Z][\w-]*)\}")
+_FONT_SLOTS = {"display", "body", "mono", "heading", "serif", "sans"}
+
+
+def unresolved_references(design_text, contract):
+    """Return [(group, name), ...] for each `{group.name}` ref in the prose that
+    does NOT resolve against the contract. Only color and font refs are validated
+    strictly (those have known keys); other groups are accepted."""
+    colors = {k.lower() for k in contract.get("colors", {})}
+    fonts = {f.lower() for f in contract.get("fonts", [])} | _FONT_SLOTS
+    bad = []
+    for group, name in _REF.findall(design_text):
+        g, n = group.lower(), name.lower()
+        if g == "color" and n not in colors:
+            bad.append((group, name))
+        elif g == "font" and n not in fonts:
+            bad.append((group, name))
+    return bad
 
 
 if __name__ == "__main__":

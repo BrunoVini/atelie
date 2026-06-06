@@ -34,6 +34,9 @@ _TYPE_MAP = {
     "duration": "duration",
     "easing": "cubicBezier",
     "breakpoint": "dimension",
+    "shadow": "shadow",      # elevation scale (--shadow-1, --shadow-2, ...)
+    "surface": "color",      # surface-elevation colors (--surface-1, ...)
+    "control": "color",      # control tokens (--control-bg / -border / -focus)
 }
 
 
@@ -108,6 +111,8 @@ def to_tailwind_preset(tokens):
         theme["extend"]["transitionDuration"] = dict(tokens["duration"])
     if "easing" in tokens:
         theme["extend"]["transitionTimingFunction"] = dict(tokens["easing"])
+    if "shadow" in tokens:
+        theme["extend"]["boxShadow"] = dict(tokens["shadow"])
     if "breakpoint" in tokens:
         theme["screens"] = dict(tokens["breakpoint"])  # top-level: define the screens
     return "module.exports = " + json.dumps({"theme": theme}, indent=2) + ";\n"

@@ -117,6 +117,68 @@ def test_slop_layout_variance_flags_template_rhythm():
     assert not any(f["kind"] == "layout-monotony" for f in check_html(varied))
 
 
+def test_scan_depth_strategy_and_known_gaps(tmp_path):
+    from scan_repo import extract_shadows, infer_depth_strategy, scan_directory
+    css = ".a{box-shadow:0 1px 2px rgba(0,0,0,.1)} .b{box-shadow:0 4px 12px rgba(0,0,0,.2)}"
+    sh = extract_shadows(css)
+    assert len(sh) == 2 and infer_depth_strategy(sh) == "layered-shadow"
+    assert infer_depth_strategy([]) == "borders-only"
+    assert infer_depth_strategy(["one"]) == "single-shadow"
+    # a flat repo (no shadows) -> borders-only + a known gap noting elevation is unmeasured
+    (tmp_path / "s.css").write_text(".x{color:#111;background:#fff;border:1px solid #ddd}")
+    rep = scan_directory(str(tmp_path))
+    assert rep["depth_strategy"] == "borders-only"
+    assert any("shadow" in g.lower() or "elevation" in g.lower() for g in rep["known_gaps"])
+
+
+def test_contract_parses_depth_and_resolves_references(tmp_path):
+    from contract import resolve_contract, unresolved_references
+    (tmp_path / "DESIGN.md").write_text(
+        "## 2. Palette\n| primary | `#2563eb` | `#ffffff` |\n"
+        "## 4. Layout\n- **Depth strategy:** borders-only\n"
+        "## 3. Typography\n- **Display:** `Sora`\n")
+    c = resolve_contract(str(tmp_path))
+    assert c["depth"] == "borders-only"
+    bad = unresolved_references("use {color.primary} on {color.brand}; head {font.display}", c)
+    assert ("color", "brand") in bad and ("color", "primary") not in bad
+    assert not any(group == "font" for group, _ in bad)   # {font.display} is a known slot
+
+
+def test_lint_flags_shadow_in_borders_only_system(tmp_path):
+    from lint_design import lint_repo, check_references
+    (tmp_path / "DESIGN.md").write_text(
+        "## 2. Palette\n| background | `#ffffff` | `#111111` |\n"
+        "## 4. Layout\n- **Depth strategy:** borders-only\n"
+        "Cards use {color.background} on {color.nope}.\n")
+    (tmp_path / "card.css").write_text(".card{box-shadow:0 4px 12px rgba(0,0,0,.15)}")
+    assert any(f["kind"] == "depth" for f in lint_repo(str(tmp_path), str(tmp_path)))
+    # {color.nope} is an unresolved token reference; {color.background} resolves
+    refvals = {f["value"] for f in check_references(str(tmp_path), str(tmp_path))}
+    assert "{color.nope}" in refvals and "{color.background}" not in refvals
+
+
+def test_census_flags_interactive_components_missing_states(tmp_path):
+    from census import build_census
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "Button.tsx").write_text("export const Button = () => <button>x</button>;")
+    (src / "Input.tsx").write_text(
+        "export const Input = () => <input className='hover:bg focus:ring disabled:opacity-50'/>;")
+    cen = build_census(str(tmp_path))
+    assert "Button" in cen["state_gaps"]          # no state hooks -> flagged
+    assert "Input" not in cen["state_gaps"]        # hover/focus/disabled present -> ok
+
+
+def test_export_tokens_emits_depth_groups():
+    from export_tokens import to_css_vars, to_tailwind_preset
+    tokens = {"shadow": {"1": "0 1px 2px #0001"}, "surface": {"0": "#fff"},
+              "control": {"bg": "#fff", "focus": "#2563eb"}}
+    css = to_css_vars(tokens)
+    assert "--shadow-1:" in css and "--surface-0:" in css and "--control-focus:" in css
+    preset = json.loads(to_tailwind_preset(tokens).split("= ", 1)[1].rstrip(";\n"))
+    assert "boxShadow" in preset["theme"]["extend"]
+
+
 def test_assess_consistency_levels():
     from assess import assess
     clean = {"colors": [{"hex": "#2563eb", "count": 9}, {"hex": "#ea580c", "count": 4},

@@ -14,9 +14,23 @@ import os
 import re
 import sys
 
-from scan_repo import _SKIP_DIRS
+from scan_repo import _SKIP_DIRS, _STYLE_EXT
 
 _COMPONENT_EXT = (".jsx", ".tsx", ".vue", ".svelte")
+# Interaction states a component should account for. `rest` is implicit (always
+# present); we look for evidence the others are handled, in the component file or a
+# co-located stylesheet (Button.tsx + Button.css / Button.module.css).
+_STATE_HOOKS = {
+    "hover": re.compile(r":hover|hover:|onMouseEnter|onMouseOver|onPointerEnter", re.I),
+    "focus": re.compile(r":focus(?:-visible)?|focus:|focus-visible:|onFocus|focusVisible", re.I),
+    "pressed": re.compile(r":active|active:|onMouseDown|onPointerDown|aria-pressed", re.I),
+    "disabled": re.compile(r":disabled|disabled:|\bdisabled\b|aria-disabled|isDisabled", re.I),
+}
+# Components for which states are expected (interactive controls).
+_INTERACTIVE = re.compile(
+    r"button|btn|input|textfield|select|link|tab|toggle|switch|checkbox|radio|"
+    r"menuitem|combobox|slider|dropdown|chip|segmented", re.I)
+_REQUIRED_STATES = ("hover", "focus", "disabled")
 # Exported React/TS components (PascalCase).
 _EXPORTS = [
     re.compile(r"export\s+default\s+function\s+([A-Z]\w+)"),
@@ -49,6 +63,18 @@ def scan_components(root):
             except Exception:
                 continue
             rel = os.path.relpath(p, root)
+            # Include a co-located stylesheet (Button.tsx + Button.css/.module.css)
+            # when looking for state coverage — states often live in the CSS.
+            stem = os.path.splitext(fn)[0]
+            state_blob = text
+            for ext in (".css", ".scss", ".sass", ".less", ".module.css", ".module.scss"):
+                sib = os.path.join(dirpath, stem + ext)
+                if os.path.exists(sib):
+                    try:
+                        state_blob += "\n" + open(sib, encoding="utf-8").read()
+                    except Exception:
+                        pass
+            states = [s for s, rx in _STATE_HOOKS.items() if rx.search(state_blob)]
             names = []
             for rx in _EXPORTS:
                 names.extend(rx.findall(text))
@@ -67,7 +93,7 @@ def scan_components(root):
             for name in names:
                 comps.append({"name": name, "file": rel,
                               "variants": list(dict.fromkeys(variants)),
-                              "props": props})
+                              "props": props, "states": states})
     return comps
 
 
@@ -78,10 +104,23 @@ def find_duplicates(comps):
     return {n: files for n, files in seen.items() if len(files) > 1}
 
 
+def state_gaps(comps):
+    """Interactive components that appear to handle no hover/focus/disabled state —
+    a design-debt signal (states may live elsewhere; treat as advisory)."""
+    gaps = {}
+    for c in comps:
+        if _INTERACTIVE.search(c["name"]):
+            missing = [s for s in _REQUIRED_STATES if s not in c.get("states", [])]
+            if missing:
+                gaps[c["name"]] = missing
+    return gaps
+
+
 def build_census(root):
     comps = scan_components(root)
     return {"count": len(comps), "components": comps,
-            "duplicates": find_duplicates(comps)}
+            "duplicates": find_duplicates(comps),
+            "state_gaps": state_gaps(comps)}
 
 
 if __name__ == "__main__":
@@ -102,6 +141,11 @@ if __name__ == "__main__":
             print("\n⚠ possible duplicates (same name, multiple files):")
             for n, files in census["duplicates"].items():
                 print(f"  {n}: {', '.join(files)}")
+        if census["state_gaps"]:
+            print("\n⚠ interactive components missing documented states "
+                  "(rest/hover/focus/pressed/disabled):")
+            for n, missing in census["state_gaps"].items():
+                print(f"  {n}: missing {', '.join(missing)}")
     # Default to the SCANNED repo's design/ dir, not the current working dir.
     out = os.path.join(root, "design", "components.json")
     if "--out" in args:

@@ -32,6 +32,10 @@ _WCAG: {{WCAG_NOTES}}_
 - **Display:** {{FONT_DISPLAY}}
 - **Body:** {{FONT_BODY}}
 - **Scale:** {{TYPE_SCALE}}  · **Weights:** {{WEIGHTS}}  · **Line-height:** {{LINE_HEIGHT}}
+- **Fallback ladder:** {{FONT_FALLBACK}}
+  <!-- For any PROPRIETARY face: closest open-source analogue + the weight/tracking
+       to match it, e.g. "Söhne → Inter @300, -0.01em"; "SF Pro → Geist". So a
+       preview without the licensed font still renders on-brand. -->
 
 ## 4. Layout & responsiveness
 - **Spacing scale:** {{SPACING_SCALE}}
@@ -46,6 +50,12 @@ _WCAG: {{WCAG_NOTES}}_
   <!-- e.g. clamp() type/space, intrinsic auto-fit grids, container queries for
        components, few content-driven breakpoints. Design the mid-range (tablet
        768–1024), not just the endpoints. See references/capabilities/responsive.md -->
+- **Depth strategy:** {{DEPTH_STRATEGY}}
+  <!-- ONE of: borders-only (flat, no shadows) | single-shadow | layered-shadow
+       (numbered scale) | surface-shift. scan_repo infers it; state it so lint can
+       enforce it (e.g. flag a shadow in a borders-only system). -->
+- **Surface scale:** {{SURFACE_SCALE}}   <!-- e.g. --surface-0 base · --surface-1 raised -->
+- **Control tokens:** {{CONTROL_TOKENS}} <!-- --control-bg · --control-border · --control-focus -->
 
 ## 5. Motion
 - **Durations:** {{DURATIONS}}  · **Easing:** {{EASING}}
@@ -62,6 +72,10 @@ _WCAG: {{WCAG_NOTES}}_
 - **Standardization ("use X, not Y"):** {{COMPONENT_STANDARDS}}
   <!-- e.g. "Use <Button variant>, never a raw <button>"; "one <DataTable>, not ad-hoc tables".
        Scale this up for large/standardized repos; a small repo can leave it light. -->
+- **Required states:** {{COMPONENT_STATES}}
+  <!-- The interaction states every control must cover: rest / hover / focus /
+       pressed / disabled. Data views also need empty / loading / error.
+       census.py flags interactive components that document none. -->
 
 ## 8. Data & charts
 - **Charts:** {{CHART_STANDARDS}}
@@ -84,3 +98,11 @@ _WCAG: {{WCAG_NOTES}}_
 
 ## 11. Overrides
 - {{OVERRIDES}}  <!-- e.g. DESIGN.marketing.md inherits this and overrides the palette -->
+
+## 12. Known gaps / not covered
+<!-- What the scan could NOT measure — so this contract is honest about where
+     generation may invent rather than pretending to be complete. scan_repo.py
+     emits these (report["known_gaps"]); paste them here and resolve or accept each.
+     Examples: no dark theme measured; single-route sample; no error states; no
+     elevation tokens (depth assumed flat). Don't silently fill a gap — name it. -->
+- {{KNOWN_GAPS}}

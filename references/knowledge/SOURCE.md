@@ -12,3 +12,8 @@ by *nextlevelbuilder*, version 2.5.0.
 
 To refresh the subset, re-distill from the upstream ui-ux-pro-max plugin's
 `data/` CSVs (in your local plugin cache, or from the upstream repository).
+
+`font-substitutes.csv` is **authored by atelier** (not from ui-ux-pro-max): a
+ladder mapping proprietary faces to the closest open-source analogue + the
+weight/tracking to match, so a preview without the licensed font still renders
+on-brand.

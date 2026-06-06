@@ -296,6 +296,39 @@ def extract_radius(text):
     return _scale_from(counter) + (["9999px"] if "9999px" in counter else [])
 
 
+# --- elevation / depth -------------------------------------------------------
+_SHADOW = re.compile(r"box-shadow\s*:\s*([^;{}]+)", re.I)
+_TW_SHADOW = re.compile(r"\bshadow-(sm|md|lg|xl|2xl|inner)\b")
+_SHADOW_NULL = {"none", "unset", "inherit", "initial", "0", "", "revert"}
+
+
+def extract_shadows(text):
+    """Distinct, non-trivial box-shadow values actually used, most-common first."""
+    counter = Counter()
+    for decl in _SHADOW.findall(text):
+        v = re.sub(r"\s+", " ", decl.strip().lower())
+        if v not in _SHADOW_NULL:
+            counter[v] += 1
+    return [s for s, _ in counter.most_common()]
+
+
+def extract_tailwind_shadows(code):
+    """Distinct Tailwind elevation utilities (shadow-sm/md/lg/...) used in code."""
+    return sorted(set(_TW_SHADOW.findall(code)))
+
+
+def infer_depth_strategy(shadows, surface_count=0):
+    """Classify the repo's depth language from its shadow vocabulary:
+    borders-only (flat) · surface-shift (no shadows but layered surfaces) ·
+    single-shadow (one elevation) · layered-shadow (a real elevation scale)."""
+    n = len(shadows)
+    if n == 0:
+        return "surface-shift" if surface_count >= 3 else "borders-only"
+    if n == 1:
+        return "single-shadow"
+    return "layered-shadow"
+
+
 # --- dark mode ---------------------------------------------------------------
 _DARK = re.compile(
     r"prefers-color-scheme\s*:\s*dark|\[data-theme=[\"']?dark|\.dark\b|"
@@ -597,7 +630,11 @@ def scan_directory(root):
         set(extract_breakpoints(style_blob + "\n" + code_blob)) | set(token_props["breakpoints"]),
         key=lambda t: int(t[:-2]))
 
-    return {
+    css_shadows = extract_shadows(style_blob + "\n" + code_blob)
+    tw_shadows = [f"shadow-{s}" for s in extract_tailwind_shadows(code_blob)]
+    shadows = css_shadows + [s for s in tw_shadows if s not in css_shadows]
+
+    report = {
         "framework": detect_framework(pkg),
         "component_lib": detect_component_lib(pkg),
         "colors": colors,
@@ -605,8 +642,36 @@ def scan_directory(root):
         "spacing": spacing,
         "radius": radius,
         "breakpoints": breakpoints,
+        "shadows": shadows,
+        "depth_strategy": infer_depth_strategy(shadows),
         "dark_mode": detect_dark_mode(style_blob + "\n" + code_blob),
     }
+    report["known_gaps"] = known_gaps(report)
+    return report
+
+
+def known_gaps(report):
+    """What the scan could NOT measure — so DESIGN.md can say where generation may
+    invent instead of pretending the contract is complete."""
+    gaps = []
+    if not report.get("dark_mode"):
+        gaps.append("No dark theme detected — dark-mode colors are unspecified; "
+                    "don't invent one silently.")
+    if not report.get("shadows"):
+        gaps.append("No shadow/elevation tokens found — depth is assumed flat "
+                    "(borders-only); confirm before introducing shadows.")
+    if len(report.get("breakpoints", [])) <= 1:
+        gaps.append("0–1 breakpoints measured — the responsive range is largely "
+                    "unspecified; design the tablet mid-range explicitly.")
+    if len(report.get("colors", [])) < 3:
+        gaps.append("Very few colors measured — the palette sample is thin; verify "
+                    "the full brand palette.")
+    if not report.get("fonts"):
+        gaps.append("No web fonts detected — typography may fall back to system "
+                    "defaults; confirm the intended faces.")
+    if not report.get("radius"):
+        gaps.append("No border-radius scale found — the corner language is unspecified.")
+    return gaps
 
 
 def _merge_scales(a, b):

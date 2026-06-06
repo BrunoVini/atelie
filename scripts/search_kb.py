@@ -25,6 +25,7 @@ _DOMAIN_FILE = {
     "products": "products.csv",
     "charts": "charts.csv",
     "ux-guidelines": "ux-guidelines.csv",
+    "font-substitutes": "font-substitutes.csv",
 }
 _KEYWORD_WEIGHT = 3.0  # the `keywords` column counts triple
 

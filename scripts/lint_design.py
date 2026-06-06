@@ -17,7 +17,7 @@ import sys
 from scan_repo import (
     _HEX, _RGB, _HSL, _hex_to_rgb, _hsl_to_rgb, _rgb_to_hex, _delta_e,
     _STYLE_EXT, _CODE_EXT, _SKIP_DIRS, _LEN, _FONT_FAMILY, _GENERIC_FONTS,
-    _TW_COLOR_CLASS, _TW_COLORS,
+    _TW_COLOR_CLASS, _TW_COLORS, _SHADOW, _SHADOW_NULL, _TW_SHADOW,
 )
 
 DELTA_E = 8.0
@@ -58,8 +58,37 @@ def _iter_colors(line):
         yield _hsl_to_rgb(h, s, l), f"hsl({h},{s}%,{l}%)"
 
 
+def _depth_findings(file_shadows, tw_shadows, rel, depth):
+    """Rule 1: any shadow in a borders-only system is drift. Rule 2: 3+ distinct
+    shadow elevations in a single-shadow system is drift (consolidate to one)."""
+    out = []
+    if not depth:
+        return out
+    if depth == "borders-only" and (file_shadows or tw_shadows):
+        line = file_shadows[0][0] if file_shadows else 1
+        val = file_shadows[0][1] if file_shadows else tw_shadows[0]
+        out.append({"file": rel, "line": line, "kind": "depth", "value": f"box-shadow {val}",
+                    "severity": "important",
+                    "fix": "borders-only depth system — remove the shadow; use a border "
+                           "or a surface-lightness shift for separation"})
+    if depth == "single-shadow":
+        distinct = {v for _, v in file_shadows} | set(tw_shadows)
+        if len(distinct) >= 3:
+            line = file_shadows[0][0] if file_shadows else 1
+            out.append({"file": rel, "line": line, "kind": "depth",
+                        "value": f"{len(distinct)} distinct shadow elevations",
+                        "severity": "important",
+                        "fix": "single-shadow system — consolidate to one elevation token"})
+    return out
+
+
 def lint_repo(root, contract_path):
     colors, fonts, spacing = _load_contract(contract_path)
+    from contract import resolve_contract
+    try:
+        depth = resolve_contract(contract_path).get("depth")
+    except Exception:
+        depth = None
     findings = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
@@ -72,7 +101,14 @@ def lint_repo(root, contract_path):
             except Exception:
                 continue
             rel = os.path.relpath(p, root)
+            file_shadows, tw_shadows = [], set()
             for i, line in enumerate(lines, 1):
+                # collect box-shadow values (for the depth rules) with line numbers
+                for decl in _SHADOW.findall(line):
+                    v = re.sub(r"\s+", " ", decl.strip().lower())
+                    if v not in _SHADOW_NULL:
+                        file_shadows.append((i, v))
+                tw_shadows.update(_TW_SHADOW.findall(line))
                 # off-palette colors
                 for rgb, raw in _iter_colors(line):
                     name, d = _nearest_token(rgb, colors)
@@ -108,6 +144,26 @@ def lint_repo(root, contract_path):
                             "severity": "important",
                             "fix": f"use a contract font: {', '.join(sorted(fonts))}",
                         })
+            findings.extend(_depth_findings(file_shadows, sorted(tw_shadows), rel, depth))
+    return findings
+
+
+def check_references(repo, contract_path=None):
+    """Lint that every `{group.name}` reference in the repo's DESIGN.md resolves
+    against the contract — binds the prose half to the token half so they can't drift."""
+    from contract import resolve_contract
+    design = os.path.join(repo, "DESIGN.md")
+    if not os.path.exists(design):
+        return []
+    from contract import unresolved_references
+    text = open(design, encoding="utf-8").read()
+    contract = resolve_contract(contract_path or repo)
+    findings = []
+    for group, name in unresolved_references(text, contract):
+        findings.append({"file": "DESIGN.md", "line": 0, "kind": "token-ref",
+                         "value": f"{{{group}.{name}}}", "severity": "important",
+                         "fix": f"no such {group} token '{name}' in the contract — fix the "
+                                "reference or add the token"})
     return findings
 
 
@@ -134,6 +190,6 @@ if __name__ == "__main__":
         print(f"no contract found for {target} — need design/design-tokens.json or "
               "DESIGN.md (run generate-design-md first)")
         sys.exit(2)
-    findings = lint_repo(repo, target)
+    findings = lint_repo(repo, target) + check_references(repo, target)
     print(json.dumps(findings, indent=2) if "--json" in args else _format(findings))
     sys.exit(1 if findings else 0)
