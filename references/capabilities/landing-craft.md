@@ -106,6 +106,18 @@ A marquee interaction that's broken or faked undercuts the whole page on close r
   section (bars growing, sparkline drawing) should animate when that section reveals —
   otherwise it finishes before the user scrolls to it and arrives dead. Trigger it from
   the same IntersectionObserver as the section.
+- **Animated numbers: the final value is the accessible value.** A count-up must have the
+  real final number as its initial DOM text (animate the *display* from 0 visually), or be
+  `aria-hidden` with a visually-hidden real value beside it. Never leave a literal `0`/`$0`
+  as the accessible name — it FOUCs to "0" if JS is slow/blocked and never announces the
+  settled figure.
+- **Don't collapse a live data panel into one brittle `role="img"`.** A dashboard/console
+  with real numbers shouldn't be a single `role="img"` whose hardcoded `aria-label`
+  silently desyncs when the copy changes. Expose the key figures as real text; reserve
+  `aria-hidden` for the purely decorative chart paths.
+- **No browser-only properties on focal content.** Avoid WebKit-only tricks like
+  `-webkit-text-security` for a hero card's masked digits (renders as literal `X`s in
+  Firefox). Use a cross-browser technique (bullet glyphs `•`, SVG, or real masked text).
 
 ## Definition of done for a landing surface
 
