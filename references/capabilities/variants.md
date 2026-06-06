@@ -27,6 +27,13 @@ or you're at the start of a design and a direction hasn't been committed.
    direction's *voice* is itself the thing being explored, say so explicitly and keep
    the structure/feature-set parallel.)
 
+**Two craft notes for comparison pages:** (1) keep the *icon medium* consistent across
+directions — if two directions use drawn inline-SVG icons, the third shouldn't fall back
+to unicode glyphs (↻ ♪ ☾); it reads as less crafted at close range. (2) `slop_check`'s
+`too-many-fonts` will fire on a multi-direction page (each direction commits its own type
+system) — that flag is *expected and acceptable here*, since the families ARE the
+comparison; don't collapse them to clear it.
+
 ## Jury (score before recommending)
 
 Before recommending, score each variant against:
