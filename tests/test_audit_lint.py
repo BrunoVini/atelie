@@ -106,6 +106,20 @@ def test_slop_card_left_border_needs_chunky_accent():  # dogfood fix
     assert "card-left-border" in {f["kind"] for f in check_html(cliche)}
 
 
+def test_slop_flags_missing_focus_visible():  # battery T1 lesson — a11y craft gate
+    from slop_check import check_html
+    no_focus = '<style>.btn{background:#3DE08A;border:0}</style><button class="btn">Go</button>'
+    assert "no-focus-visible" in {f["kind"] for f in check_html(no_focus)}
+    has_fv = ('<style>.btn{background:#3DE08A}.btn:focus-visible{outline:2px solid #fff}</style>'
+              '<button class="btn">Go</button>')
+    assert "no-focus-visible" not in {f["kind"] for f in check_html(has_fv)}
+    plain_focus = ('<style>a{color:#09f}a:focus{outline:2px solid #09f}</style>'
+                   '<a href="#x">link</a>')
+    assert "no-focus-visible" not in {f["kind"] for f in check_html(plain_focus)}
+    # no interactive elements present -> never fires (guards minimal snippets)
+    assert "no-focus-visible" not in {f["kind"] for f in check_html('<style>body{color:#111}</style><p>hi</p>')}
+
+
 def test_slop_oklch_warm_neutral_default_ban():
     from slop_check import check_html
     warm = '<style>body{background:oklch(0.96 0.02 80)}</style>'

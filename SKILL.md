@@ -95,6 +95,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Plan a robust / multi-surface effort (redesign, rollout) | `references/workflows/design-plan.md` | contract + council |
 | Write real UI code into an existing repo | `references/workflows/architecture-fit.md` | `survey_repo.py`, `census.py` |
 | A hi-fi prototype / app mockup / device frame | `references/capabilities/prototypes.md` | `assets/frames/*.jsx` |
+| A landing / marketing / hero page (make it read *designed*) | `references/capabilities/landing-craft.md` | `slop_check.py` |
 | A live preview / demo / "show me" / pick between options | `references/capabilities/preview.md` | `scripts/preview/start.sh` |
 | Iterate live on an element (pick → contract-bound variants → accept into source) | `references/capabilities/preview.md` | `scripts/edit_apply.py` |
 | 2-3 design directions to choose from | `references/capabilities/variants.md` | `assets/engines/canvas.jsx` |
@@ -144,9 +145,16 @@ node scripts/responsive_check.mjs <file|url>                     # overflow+coll
 ```
 
 Run this loop on your OWN generated output, not just the user's — it routinely catches
-generic-font/oklch-default tells, contrast misses, and decoration drift you won't eyeball.
+generic-font/oklch-default tells, contrast misses, missing keyboard focus
+(`no-focus-visible`), and decoration drift you won't eyeball.
 If you can't render (no browser), say so and rely on the static checks. Skipping this is
 the difference between "I made a page" and "I made a verified, on-contract page."
+
+**Anti-slop gets you to *clean*; craft is what makes it *win*.** For any landing / hero /
+marketing surface, also clear the craft gates in `references/capabilities/landing-craft.md`
+(hero focal-moment + depth, scroll-reveal that pays off below the fold, no template filler,
+the primary CTA as the loudest pixel at rest, `:focus-visible` everywhere). A page that is
+merely clean ties a careful vanilla model; a page that is clean **and** crafted beats it.
 
 ## Quick start
 

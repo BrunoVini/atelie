@@ -232,6 +232,26 @@ def _structural_tells(html):
     return findings
 
 
+_INTERACTIVE_EL = re.compile(r"<button\b|<a\b[^>]*\bhref|<input\b|<select\b|<textarea\b", re.I)
+_BTN_STYLE = re.compile(r"\.btn\b|\bbutton\s*\{", re.I)
+_FOCUS_RULE = re.compile(r":focus(?:-visible)?\b", re.I)
+_HAS_STYLE = re.compile(r"<style\b", re.I)
+
+
+def _a11y_tells(html):
+    """Mechanical accessibility gate: a real designer styles :focus, AI usually only
+    styles :hover. Flag styled interactive controls with no focus ring at all —
+    keyboard users get nothing (WCAG 2.4.7). Fires only on a styled page that has
+    actual interactive elements, so minimal snippets don't false-positive."""
+    interactive = _INTERACTIVE_EL.search(html) or _BTN_STYLE.search(html)
+    if interactive and _HAS_STYLE.search(html) and not _FOCUS_RULE.search(html):
+        return [{"severity": "important", "kind": "no-focus-visible",
+                 "detail": "interactive controls are styled but no :focus/:focus-visible rule "
+                           "exists — keyboard users get no visible focus (WCAG 2.4.7). Add a ring, "
+                           "e.g. :focus-visible{outline:2px solid var(--primary);outline-offset:2px}."}]
+    return []
+
+
 def _warm_neutral_default(html, contract):
     if _contract_declares_warm(contract):
         return []                                   # the repo declares it — law, not slop
@@ -323,9 +343,10 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
         findings.append({"severity": "polish", "kind": "too-many-fonts",
                          "detail": f"{len(distinct)} font families — tighten to a display + body (+mono)"})
 
-    # 7–9. Copy, structural/editorial, and model-profile tells.
+    # 7–10. Copy, structural/editorial, a11y, and model-profile tells.
     findings.extend(_copy_tells(html))
     findings.extend(_structural_tells(html))
+    findings.extend(_a11y_tells(html))
     findings.extend(_profile_tells(html, profile))
     return findings
 
