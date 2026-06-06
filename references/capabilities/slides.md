@@ -25,9 +25,27 @@ the contract; a deck is just another surface that must match the brand.
 
 ## Export (optional, ask first)
 
-Offer derivatives only if the user wants them:
-- **PDF** — print-to-PDF of the deck (headless browser print).
-- **PPTX** — editable export via an external slides-to-pptx step (not bundled).
+Offer derivatives only if the user wants them. Both exporters need the headless
+browser; `export PATH="$HOME/.local/bin:$PATH"` first if ffmpeg/chromium live there.
+
+- **PDF — `scripts/export_pdf.mjs <deck.html> <out.pdf>`.** Flattens the `<deck-stage>`
+  (the shadow-DOM slot doesn't paginate headlessly) and prints one slide per page at the
+  deck's native pixel size. Output is **vector** — selectable text, embedded fonts, sharp at
+  any zoom — not an image bed. Works on any page too (infographics: pass `--format A4` or
+  `--width/--height`, or let the page's own `@page` rule win).
+- **PPTX — editable, two steps, stdlib-only on the Python side:**
+  1. `node scripts/extract_deck.mjs <deck.html> <specDir>` — captures each slide's text-free
+     background PNG (gradients/SVG/shapes survive) + every text run's box, font, color, align.
+  2. `python3 scripts/export_pptx.py <specDir> <out.pptx>` — lays each background full-bleed
+     with a **real, editable PowerPoint text frame** over every run. Opens looking identical,
+     but every word is selectable/editable — not an image-bed fake.
+  Honest limit: shapes/photos ride in the background image, so only TEXT is individually
+  editable (that trade buys perfect fidelity with no layout-engine guesswork). Speaker-notes
+  export is not yet wired into the PPTX path — note that if the user needs editable notes.
+
+The same `export_pdf.mjs` is the print-grade export for **infographics / data-viz** (vector
+PDF); for raster use `screenshot.mjs --full` (300dpi-ish via deviceScaleFactor), and for SVG
+deliverables author the art as inline `<svg>` and save it directly (already vector).
 
 ## Preview
 

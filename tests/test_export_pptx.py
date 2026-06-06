@@ -1,0 +1,140 @@
+"""Tests for the stdlib PPTX writer (export_pptx.py).
+
+Builds a deck from a synthetic spec (no browser needed) and asserts the package
+is a structurally valid OOXML PowerPoint with EDITABLE text frames — well-formed
+XML, content-type coverage, resolvable relationships, and real <a:t> runs.
+"""
+import json
+import posixpath
+import re
+import struct
+import zipfile
+import zlib
+from xml.dom.minidom import parseString
+
+import export_pptx
+
+
+def _tiny_png():
+    """A minimal valid 2x2 white PNG, built with stdlib (no Pillow)."""
+    def chunk(tag, data):
+        c = tag + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0)  # 2x2, 8-bit, RGB
+    raw = b"".join(b"\x00" + b"\xff\xff\xff\xff\xff\xff" for _ in range(2))  # 2 rows of 2 white px
+    idat = zlib.compress(raw)
+    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+
+
+def _make_spec(tmp_path):
+    media = tmp_path / "media"
+    media.mkdir(parents=True, exist_ok=True)
+    png = _tiny_png()
+    (media / "slide-1.png").write_bytes(png)
+    (media / "slide-2.png").write_bytes(png)
+    spec = {
+        "width": 1920,
+        "height": 1080,
+        "slides": [
+            {
+                "bg": "media/slide-1.png",
+                "texts": [
+                    {"x": 120, "y": 300, "w": 800, "h": 140, "text": "Northwind",
+                     "sizePx": 96, "color": "rgb(26, 32, 48)", "bold": True, "italic": False,
+                     "align": "l", "font": "Georgia"},
+                    {"x": 120, "y": 460, "w": 900, "h": 60, "text": "Two\nlines",
+                     "sizePx": 40, "color": "#1a2030", "bold": False, "italic": False,
+                     "align": "ctr", "font": "Georgia"},
+                ],
+            },
+            {"bg": "media/slide-2.png", "texts": [
+                {"x": 100, "y": 100, "w": 600, "h": 120, "text": "Slide two",
+                 "sizePx": 80, "color": "rgba(255,255,255,1)", "bold": True, "italic": False,
+                 "align": "r", "font": "Inter"}]},
+        ],
+    }
+    (tmp_path / "spec.json").write_text(json.dumps(spec))
+    return tmp_path
+
+
+def test_pptx_is_valid_ooxml_with_editable_text(tmp_path):
+    spec_dir = _make_spec(tmp_path)
+    out = spec_dir / "deck.pptx"
+    n = export_pptx.build(str(spec_dir), str(out))
+    assert n == 2
+
+    z = zipfile.ZipFile(out)
+    names = z.namelist()
+    assert z.testzip() is None  # zip integrity
+
+    # 1) every xml/rels part is well-formed
+    for nm in names:
+        if nm.endswith(".xml") or nm.endswith(".rels"):
+            parseString(z.read(nm))  # raises on malformed
+
+    # 2) content types cover every part
+    ct = z.read("[Content_Types].xml").decode()
+    defaults = set(re.findall(r'Default Extension="([^"]+)"', ct))
+    overrides = set(re.findall(r'Override PartName="([^"]+)"', ct))
+    for nm in names:
+        if nm == "[Content_Types].xml":
+            continue
+        ext = nm.rsplit(".", 1)[-1].lower()
+        assert ("/" + nm) in overrides or ext in defaults, f"no content-type for {nm}"
+
+    # 3) every relationship target resolves to a real part
+    for nm in names:
+        if not nm.endswith(".rels"):
+            continue
+        base = posixpath.dirname(posixpath.dirname(nm))
+        for tgt, mode in re.findall(r'Target="([^"]+)"(?:\s+TargetMode="([^"]+)")?', z.read(nm).decode()):
+            if mode == "External" or tgt.startswith("http"):
+                continue
+            resolved = posixpath.normpath(posixpath.join(base, tgt))
+            assert resolved in names, f"{nm} -> {tgt} missing ({resolved})"
+
+    # 4) presentation r:id references are all defined in its rels
+    pres = z.read("ppt/presentation.xml").decode()
+    relids = set(re.findall(r'Id="([^"]+)"', z.read("ppt/_rels/presentation.xml.rels").decode()))
+    assert set(re.findall(r'r:id="([^"]+)"', pres)) <= relids
+
+    # 5) the editable text is really in the slide (not just baked into the image)
+    s1 = z.read("ppt/slides/slide1.xml").decode()
+    runs = re.findall(r"<a:t>([^<]*)</a:t>", s1)
+    assert "Northwind" in runs
+    assert "Two" in runs and "lines" in runs  # multi-line split into paragraphs
+    # font + size carried onto the run (96px -> 72pt -> sz 7200)
+    assert 'typeface="Georgia"' in s1
+    assert 'sz="7200"' in s1
+    # background image embedded, alignment honored
+    assert 'r:embed="rIdImg"' in s1
+    assert 'algn="ctr"' in s1
+
+
+def test_color_and_size_conversions():
+    assert export_pptx.css_color_to_hex("rgb(26, 32, 48)") == "1A2030"
+    assert export_pptx.css_color_to_hex("rgba(255,255,255,1)") == "FFFFFF"
+    assert export_pptx.css_color_to_hex("#1a2030") == "1A2030"
+    assert export_pptx.css_color_to_hex("#abc") == "AABBCC"
+    assert export_pptx.css_color_to_hex("garbage") == "000000"
+    assert export_pptx.px_to_emu(96) == 914400  # 96px = 1in = 914400 EMU
+    assert export_pptx.px_to_sz(96) == 7200      # 96px -> 72pt -> sz 7200
+
+
+def test_xml_special_chars_are_escaped(tmp_path):
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "slide-1.png").write_bytes(_tiny_png())
+    spec = {"width": 1280, "height": 720, "slides": [
+        {"bg": "media/slide-1.png", "texts": [
+            {"x": 0, "y": 0, "w": 400, "h": 80, "text": "A & B <tag> \"q\"",
+             "sizePx": 32, "color": "#000", "bold": False, "italic": False, "align": "l", "font": "Arial"}]}]}
+    (tmp_path / "spec.json").write_text(json.dumps(spec))
+    out = tmp_path / "x.pptx"
+    export_pptx.build(str(tmp_path), str(out))
+    z = zipfile.ZipFile(out)
+    s1 = z.read("ppt/slides/slide1.xml").decode()
+    parseString(s1)  # must stay well-formed despite the ampersand/brackets
+    assert "A &amp; B &lt;tag&gt;" in s1

@@ -102,7 +102,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Iterate live on an element (pick → contract-bound variants → accept into source) | `references/capabilities/preview.md` | `scripts/edit_apply.py` |
 | 2-3 design directions to choose from | `references/capabilities/variants.md` | `assets/engines/canvas.jsx` |
 | A hard call / "weigh the options" / decide a direction | `references/capabilities/council.md` | (5-agent council) |
-| Slides / a deck / presentation | `references/capabilities/slides.md` | `assets/engines/deck.js` |
+| Slides / a deck / presentation (+ export to PDF or editable PPTX) | `references/capabilities/slides.md` | `assets/engines/deck.js`, `export_pdf.mjs`, `extract_deck.mjs`+`export_pptx.py` |
 | An animation / explainer / narrated video / MP4·GIF | `references/capabilities/animations.md` (+ `capabilities/animation/`) | `assets/engines/narration.jsx`, `export_video.sh` |
 | Scroll-driven motion (pin/scrub, horizontal hijack, scroll-reveal) | `references/capabilities/scroll-motion.md` | — |
 | A 3D / shader / WebGPU / Three.js hero (delegate + feed tokens) | `references/capabilities/3d-hero.md` | (routes to `webgpu-threejs-tsl`) |
