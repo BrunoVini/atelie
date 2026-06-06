@@ -107,6 +107,14 @@ A marquee interaction that's broken or faked undercuts the whole page on close r
 - **Never `display:none` real content at mobile — reflow it.** Hiding the 2nd/3rd columns
   of a board, or the hero's signature visual, on phones deletes substance the page promised.
   Stack, horizontally scroll, or condense instead, so small screens get the whole story.
+- **SVG that connects to layout must not drift.** A node-graph / connector SVG with
+  `preserveAspectRatio="none"` + hardcoded bezier endpoints lines up only at the design
+  width and smears strokes elsewhere. Draw connectors from measured positions, anchor nodes
+  absolutely in the SVG's own coordinate space, or use `vector-effect:non-scaling-stroke`
+  with a fixed aspect — so the diagram holds at every width.
+- **Swappable panels (tabs) of different heights jump the page.** Lock a consistent panel
+  height or animate the transition so switching a build/deploy/monitor tab doesn't shift
+  everything below it.
 - **Tie in-view micro-motion to the reveal, not load.** Data-viz inside a below-the-fold
   section (bars growing, sparkline drawing) should animate when that section reveals —
   otherwise it finishes before the user scrolls to it and arrives dead. Trigger it from
