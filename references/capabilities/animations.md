@@ -53,6 +53,14 @@ scripts/export_video.sh anim.html out.gif 8 30 960 15          # GIF: 960px-wide
 - Requires `ffmpeg` + a headless browser (playwright/puppeteer). If missing, the
   script warns and the HTML stays valid to open in a browser.
 
+## Scroll-driven motion
+
+For landing-page motion tied to the scroll position — pinned/scrubbed sections,
+horizontal scroll-hijack, scroll-reveal stagger — see
+`capabilities/scroll-motion.md` (canonical GSAP ScrollTrigger / CSS scroll-timeline
+skeletons, the jank/`useState`-progress bans, and reduced-motion gating). That's a
+different discipline from the timeline/narrated motion above.
+
 ## Preview
 
 For a live, scrubbable view, serve the HTML through the preview server
