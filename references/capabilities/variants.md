@@ -18,6 +18,14 @@ or you're at the start of a design and a direction hasn't been committed.
 3. Lay them out for comparison with `assets/engines/canvas.jsx` (side-by-side), or
    serve them as `cards`/`split` on the preview server (`capabilities/preview.md`)
    so the user clicks to pick.
+4. **Hold the CONTENT identical across directions — vary only the design.** The point
+   of a comparison is to isolate the design choice, so the headline, subhead, CTA
+   label, and feature names must be the *same words* in every direction; only type,
+   color, layout, and motion change. Don't reword the copy per direction (that
+   confounds the comparison), and never claim "same content, different design" while
+   actually changing the words — the framing and the artifact must agree. (If a
+   direction's *voice* is itself the thing being explored, say so explicitly and keep
+   the structure/feature-set parallel.)
 
 ## Jury (score before recommending)
 

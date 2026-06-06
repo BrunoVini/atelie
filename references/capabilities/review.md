@@ -165,6 +165,28 @@ whole sweep and re-screenshot the affected breakpoint. A fix you didn't re-rende
 is a guess. The collision is only resolved when the sweep is clean at *every*
 width and the screenshot confirms it — not when one viewport happens to look right.
 
+## 3b. Verify the web fonts actually LOADED (not just linked)
+
+A `<link>` to a font is not proof the font rendered. A single typo in a Google Fonts
+URL — `opt_sz` instead of `opsz`, a misspelled family, a weight you didn't request —
+fails *silently*: the browser drops it and falls back to a system serif/sans, so your
+carefully-chosen type system quietly becomes Georgia/Arial and you never see an error.
+This is invisible in code review and easy to miss in a screenshot if you don't know
+the intended face.
+
+So after rendering, confirm every declared family is really active:
+
+```js
+// in the page context (Playwright page.evaluate), after document.fonts.ready
+await document.fonts.ready;
+['Newsreader','Source Serif 4','Archivo'].map(f => [f, document.fonts.check(`16px "${f}"`)]);
+// any false → that family did not load; re-check the Google Fonts URL (axis spelling
+// like opsz/wght, family name, requested weights) and the @font-face/link.
+```
+
+If a family is `false`, fix the URL/declaration and re-render — don't ship a deck,
+prototype, or variants page whose intended type silently degraded to a fallback.
+
 ## 4. Adversarial pass (high-stakes)
 
 For important work, run the critique as a skeptic trying to REFUTE that the design
