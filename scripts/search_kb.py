@@ -9,8 +9,9 @@ pairing / product mapping.
 Usage:
     python3 search_kb.py "fintech trust" --domain palettes [--max-results 3]
 
-Domains map to files: palettes -> palettes.csv, typography -> typography.csv,
-products -> products.csv (extend by dropping more CSVs into references/knowledge).
+Domains: palettes · typography · products · charts · ux-guidelines ·
+font-substitutes · styles · stack-guidance · reasoning · brand-exemplars
+(each maps to <domain>.csv; add the file to references/knowledge + _DOMAIN_FILE).
 """
 import csv
 import math
@@ -26,6 +27,10 @@ _DOMAIN_FILE = {
     "charts": "charts.csv",
     "ux-guidelines": "ux-guidelines.csv",
     "font-substitutes": "font-substitutes.csv",
+    "styles": "styles.csv",
+    "stack-guidance": "stack-guidance.csv",
+    "reasoning": "reasoning.csv",
+    "brand-exemplars": "brand-exemplars.csv",
 }
 _KEYWORD_WEIGHT = 3.0  # the `keywords` column counts triple
 
@@ -87,7 +92,7 @@ def search(query, domain, max_results=3):
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args:
-        print("usage: search_kb.py \"<query>\" --domain <palettes|typography|products> [--max-results N]")
+        print("usage: search_kb.py \"<query>\" --domain <" + "|".join(_DOMAIN_FILE) + "> [--max-results N]")
         sys.exit(1)
     query = args[0]
     domain = "palettes"

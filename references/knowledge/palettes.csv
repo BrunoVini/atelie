@@ -7,3 +7,47 @@ Creative,"agency,portfolio,studio,creative,design,art",#111111,#FFFFFF,#F43F5E,#
 AI,"ai,ml,chatbot,automation,assistant,model",#6366F1,#FFFFFF,#06B6D4,#04222A,#0B0B12,#E5E7EB,#1A1A24,#2A2A38,#F43F5E,"Indigo AI + cyan, dark-first minimal chrome"
 Education,"education,learning,course,edtech,school,student",#7C3AED,#FFFFFF,#F59E0B,#3A2200,#FAF5FF,#3B0764,#F1E9FB,#E9D5FF,#DC2626,Purple focus + amber encouragement
 Productivity,"productivity,tasks,notes,calendar,tool,workflow",#0F766E,#FFFFFF,#F97316,#FFFFFF,#F8FAFC,#134E4A,#E6F0EF,#CCE3E0,#DC2626,"Teal focus, low-distraction neutrals"
+E-commerce Luxury,"ecommerce,luxury,premium,fashion,gold,high-end",#1C1917,#FFFFFF,#A16207,#FFFFFF,#FAFAF9,#0C0A09,#E8ECF0,#D6D3D1,#DC2626,Premium near-black + restrained gold accent
+B2B Service,"b2b,enterprise,service,professional,navy,corporate",#0F172A,#FFFFFF,#0369A1,#FFFFFF,#F8FAFC,#020617,#E8ECF1,#E2E8F0,#DC2626,Professional navy with confident blue CTA
+Financial Dashboard,"finance,dashboard,kpi,trading,dark,metrics",#0F172A,#FFFFFF,#22C55E,#0F172A,#020617,#F8FAFC,#1A1E2F,#334155,#EF4444,Dark canvas with green positive indicators
+Healthcare App,"health,medical,app,patient,cyan,care",#0891B2,#FFFFFF,#059669,#FFFFFF,#ECFEFF,#164E63,#E8F1F6,#A5F3FC,#DC2626,Calm clinical cyan paired with health green
+Educational App,"education,app,learning,kids,indigo,playful",#4F46E5,#FFFFFF,#EA580C,#FFFFFF,#EEF2FF,#1E1B4B,#EBEEF8,#C7D2FE,#DC2626,Playful indigo + energetic orange encouragement
+Creative Agency,"agency,creative,bold,pink,portfolio,marketing",#EC4899,#FFFFFF,#0891B2,#FFFFFF,#FDF2F8,#831843,#F1EEF5,#FBCFE8,#DC2626,Bold pink expression balanced by cyan accent
+Gaming,"gaming,game,neon,esports,arcade,entertainment",#7C3AED,#FFFFFF,#F43F5E,#FFFFFF,#0F0F23,#E2E8F0,#27273B,#4C1D95,#EF4444,Neon purple on near-black with rose action
+Fintech Crypto,"fintech,crypto,web3,gold,trading,dark",#F59E0B,#0F172A,#8B5CF6,#FFFFFF,#0F172A,#F8FAFC,#272F42,#334155,#EF4444,Gold value signal + purple tech on dark
+Social Media App,"social,media,feed,community,rose,engagement",#E11D48,#FFFFFF,#2563EB,#FFFFFF,#FFF1F2,#881337,#F0ECF2,#FECDD3,#DC2626,Vibrant rose with engagement blue accent
+Design System,"design,system,tokens,components,docs,library",#4F46E5,#FFFFFF,#EA580C,#FFFFFF,#EEF2FF,#312E81,#EBEEF8,#C7D2FE,#DC2626,Indigo brand anchoring clear doc hierarchy
+AI Chatbot Platform,"ai,chatbot,assistant,llm,purple,conversational",#7C3AED,#FFFFFF,#0891B2,#FFFFFF,#FAF5FF,#1E1B4B,#ECEEF9,#DDD6FE,#DC2626,AI purple with cyan interactive moments
+NFT Web3,"nft,web3,crypto,blockchain,purple,gold",#8B5CF6,#FFFFFF,#FBBF24,#0F172A,#0F0F23,#F8FAFC,#27273B,#4C1D95,#EF4444,Purple tech surface with gold value cues
+Creator Economy,"creator,economy,influencer,pink,content,monetize",#EC4899,#FFFFFF,#EA580C,#FFFFFF,#FDF2F8,#831843,#F1EEF5,#FBCFE8,#DC2626,Creator pink with engagement orange
+Mental Health App,"mental,health,wellness,calm,lavender,therapy",#8B5CF6,#FFFFFF,#059669,#FFFFFF,#FAF5FF,#4C1D95,#EDEFF9,#EDE9FE,#DC2626,Calming lavender softened by wellness green
+Dating App,"dating,romance,match,rose,social,relationships",#E11D48,#FFFFFF,#EA580C,#FFFFFF,#FFF1F2,#881337,#F0ECF2,#FECDD3,#DC2626,Romantic rose warmed with orange accent
+Luxury Brand,"luxury,premium,fashion,black,gold,refined",#1C1917,#FFFFFF,#A16207,#FFFFFF,#FAFAF9,#0C0A09,#E8ECF0,#D6D3D1,#DC2626,Premium black with restrained gold accent
+Fitness Gym App,"fitness,gym,workout,energy,orange,dark",#F97316,#0F172A,#22C55E,#0F172A,#1F2937,#F8FAFC,#37414F,#374151,#EF4444,Energy orange + success green on dark
+Travel Tourism,"travel,tourism,adventure,sky,booking,vacation",#0EA5E9,#0F172A,#EA580C,#FFFFFF,#F0F9FF,#0C4A6E,#E8F2F8,#BAE6FD,#DC2626,Sky blue optimism with adventure orange
+Legal Services,"legal,law,firm,authority,navy,trust",#1E3A8A,#FFFFFF,#B45309,#FFFFFF,#F8FAFC,#0F172A,#E9EEF5,#CBD5E1,#DC2626,Authority navy grounded by trust gold
+Insurance,"insurance,coverage,security,blue,protection,trust",#0369A1,#FFFFFF,#16A34A,#FFFFFF,#F0F9FF,#0C4A6E,#E7EFF5,#BAE6FD,#DC2626,Security blue with protected green accent
+Banking,"banking,finance,trust,navy,gold,traditional",#0F172A,#FFFFFF,#A16207,#FFFFFF,#F8FAFC,#020617,#E8ECF1,#E2E8F0,#DC2626,Trust navy with premium gold restraint
+Music Streaming,"music,streaming,audio,dark,green,playlist",#1E1B4B,#FFFFFF,#22C55E,#0F172A,#0F0F23,#F8FAFC,#27273B,#312E81,#EF4444,Deep audio indigo with play-green accent
+Video Streaming,"video,streaming,ott,cinema,dark,play",#0F0F23,#FFFFFF,#E11D48,#FFFFFF,#000000,#F8FAFC,#181818,#312E81,#EF4444,Cinema black with play-red action
+Job Board,"jobs,recruitment,hiring,careers,blue,professional",#0369A1,#FFFFFF,#16A34A,#FFFFFF,#F0F9FF,#0C4A6E,#E7EFF5,#BAE6FD,#DC2626,Professional blue with success green
+Marketplace,"marketplace,p2p,trust,purple,transaction,listings",#7C3AED,#FFFFFF,#16A34A,#FFFFFF,#FAF5FF,#4C1D95,#ECEEF9,#DDD6FE,#DC2626,Trust purple with transaction green
+Automotive,"automotive,car,dealership,dark,red,premium",#1E293B,#FFFFFF,#DC2626,#FFFFFF,#F8FAFC,#0F172A,#E9EDF1,#E2E8F0,#DC2626,Premium dark slate with action red
+Medical Clinic,"clinic,medical,teal,health,care,appointment",#0891B2,#FFFFFF,#16A34A,#FFFFFF,#F0FDFA,#134E4A,#E8F1F6,#CCFBF1,#DC2626,Medical teal paired with health green
+Bakery Cafe,"bakery,cafe,food,warm,brown,cream",#92400E,#FFFFFF,#92400E,#FFFFFF,#FEF3C7,#78350F,#EDEEF0,#FDE68A,#DC2626,Warm baked brown over cream backdrop
+Brewery Winery,"brewery,winery,craft,burgundy,gold,beverage",#7C2D12,#FFFFFF,#A16207,#FFFFFF,#FEF2F2,#450A0A,#ECEDF0,#FECACA,#DC2626,Deep burgundy with craft gold accent
+News Media,"news,media,breaking,red,journalism,headlines",#DC2626,#FFFFFF,#1E40AF,#FFFFFF,#FEF2F2,#450A0A,#F0EDF1,#FECACA,#DC2626,Breaking red urgency with link blue
+Magazine Blog,"magazine,blog,editorial,black,reading,longform",#18181B,#FFFFFF,#EC4899,#FFFFFF,#FAFAFA,#09090B,#E8ECF0,#E4E4E7,#DC2626,Editorial black with a single accent pink
+Sports Club,"sports,team,club,red,fans,athletics",#DC2626,#FFFFFF,#A16207,#FFFFFF,#FEF2F2,#7F1D1D,#F0EDF1,#FECACA,#DC2626,Bold team red with championship gold
+Museum Gallery,"museum,gallery,art,monochrome,whitespace,culture",#18181B,#FFFFFF,#52525B,#FFFFFF,#FAFAFA,#09090B,#E8ECF0,#E4E4E7,#DC2626,Gallery black on generous white space
+Cybersecurity,"cybersecurity,security,terminal,matrix,green,dark",#16A34A,#0F172A,#FF3333,#FFFFFF,#000000,#E0E0E0,#181818,#1F1F1F,#EF4444,Matrix green on black with alert red
+Developer Tool,"developer,ide,code,dark,terminal,tooling",#1E293B,#FFFFFF,#22C55E,#0F172A,#0F172A,#F8FAFC,#272F42,#475569,#EF4444,Code-editor dark with run green
+Biotech,"biotech,science,life,dna,blue,research",#0EA5E9,#0F172A,#059669,#FFFFFF,#F0F9FF,#0C4A6E,#E8F2F8,#BAE6FD,#DC2626,DNA blue with life-science green accent
+Space Tech,"space,aerospace,launch,dark,starlight,blue",#3B82F6,#FFFFFF,#3B82F6,#FFFFFF,#0B0B10,#F8FAFC,#232328,#1E293B,#EF4444,Starlight white on void with launch blue
+Climate Tech,"climate,energy,sustainable,green,solar,eco",#059669,#FFFFFF,#16A34A,#FFFFFF,#ECFDF5,#064E3B,#E8F1F3,#A7F3D0,#DC2626,Nature green expressing sustainability
+Chat Messaging,"chat,messaging,realtime,blue,online,conversation",#2563EB,#FFFFFF,#059669,#FFFFFF,#FFFFFF,#0F172A,#F1F5FD,#E4ECFC,#DC2626,Messenger blue with online-green status
+Notes Writing,"notes,writing,ink,warm,amber,focus",#78716C,#FFFFFF,#D97706,#FFFFFF,#FFFBEB,#0F172A,#F6F6F6,#EEEDED,#DC2626,Warm ink neutrals with amber accent on cream
+Food Delivery,"food,delivery,ondemand,orange,appetite,fast",#EA580C,#FFFFFF,#2563EB,#FFFFFF,#FFF7ED,#0F172A,#FDF4F0,#FCEAE1,#DC2626,Appetizing orange balanced by trust blue
+Meditation,"meditation,mindfulness,calm,lavender,wellness,zen",#7C3AED,#FFFFFF,#059669,#FFFFFF,#FAF5FF,#0F172A,#F7F3FD,#EFE7FC,#DC2626,Calm lavender with mindful green
+Password Manager,"password,security,vault,dark,blue,secure",#1E3A5F,#FFFFFF,#059669,#FFFFFF,#0F172A,#FFFFFF,#10192E,#1E3A5F,#DC2626,Vault dark-blue with secure green signal
+Casual Game,"game,casual,puzzle,cheerful,pink,reward",#EC4899,#FFFFFF,#F59E0B,#0F172A,#FDF2F8,#0F172A,#FDF4F8,#FCE9F2,#DC2626,Cheerful pink with reward-gold accent

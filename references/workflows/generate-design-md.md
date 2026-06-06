@@ -58,11 +58,20 @@ drives which knowledge-base recommendations apply.
 ```bash
 python3 scripts/search_kb.py "<product type + tone keywords>" --domain palettes
 python3 scripts/search_kb.py "<product type + tone keywords>" --domain typography
+python3 scripts/search_kb.py "<product type + tone keywords>" --domain styles    # named styles
+python3 scripts/search_kb.py "<stack>" --domain stack-guidance                   # react/next/shadcn/…
 ```
 
 Use the KB to (a) fill gaps when the scan is sparse (new/empty repo), and
 (b) sanity-check accessibility (contrast, WCAG). The empirical scan WINS over KB
 suggestions when both exist — the KB only fills holes.
+
+**Greenfield only (gated):** when there is **no repo signal at all** (empty/new
+project, or "make it like Stripe"), you may consult the cold-start reasoning aid
+(`--domain reasoning`) and the brand seeds (`--domain brand-exemplars`) to propose a
+direction. These are SEEDS, not a contract: they NEVER override a repo that already
+speaks, and the output still terminates in atelier's `DESIGN.md` (not a separate
+persistent file). The moment real signal exists, the empirical scan wins.
 
 ### 4. Write DESIGN.md
 

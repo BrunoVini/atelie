@@ -75,7 +75,10 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | "Make it like this" / import a reference / cold start | `references/workflows/generate-design-md.md` | `import_reference.py` |
 | Survey the frontend architecture before writing code | `references/workflows/architecture-fit.md` | `survey_repo.py` |
 | Reuse existing components / component inventory | `references/workflows/census.md` | `census.py` |
-| Palette / font / product-type recommendations | `references/knowledge/` | `search_kb.py` |
+| Palette / font / style / product recommendations | `references/knowledge/` | `search_kb.py` |
+| "Make it like Stripe/Linear/Notion…" (named brand) | `references/knowledge/` (brand-exemplars) | `search_kb.py` |
+| Stack-idiomatic do/don't (react/next/shadcn/swiftui/flutter/rn) | `references/knowledge/` | `search_kb.py` |
+| Greenfield with NO repo signal (cold start reasoning) | `references/workflows/generate-design-md.md` | `search_kb.py` (reasoning) |
 | The design philosophy / why "no generic look" | `references/design-philosophy.md` | — |
 
 ### GENERATE — produce artifacts that obey the contract

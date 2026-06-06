@@ -1,0 +1,37 @@
+stack,topic,keywords,do,dont,note
+react,state,"state,usestate,derived,lift",Derive values from existing state; lift shared state to the nearest common ancestor,Don't duplicate or sync state that can be computed,Less state means fewer bugs and re-renders
+react,effects,"effect,useeffect,cleanup,fetch",Return a cleanup for subscriptions and timers; prefer event handlers over effects,Don't fetch in useEffect when a framework loader or SWR will do,Effects are for syncing with external systems only
+react,memo,"memo,usememo,callback,rerender",Memoize only proven-expensive components and stable callbacks,Don't wrap everything in memo/useMemo by reflex,Premature memoization adds noise without measured wins
+react,keys,"key,list,map,reconcile",Use stable unique keys when rendering lists,Don't use array index as key for reorderable lists,Index keys corrupt state on insert/reorder
+react,transitions,"transition,starttransition,nonurgent,responsive",Wrap non-urgent updates in startTransition,Don't block the UI on every keystroke or filter,Keeps typing responsive while heavy work defers
+react,lists,"list,virtualize,content-visibility,perf",Virtualize or use content-visibility for long lists,Don't render thousands of rows at once,Off-screen work is wasted work
+next,server-components,"rsc,server,client,use-client",Default to Server Components for static and data content,Don't slap 'use client' on everything,Server Components ship zero JS and fetch closer to data
+next,data,"fetch,cache,parallel,waterfall",Start fetches early and await late; parallelize independent ones,Don't chain sequential awaits creating request waterfalls,Parallel fetching cuts time-to-first-byte
+next,routing,"app-router,loading,error,route",Use App Router with loading.tsx and error.tsx per route,Don't hand-roll loading/error UI in page bodies,File conventions give streaming and error boundaries free
+next,images,"image,next-image,lazy,cls",Use next/image for sizing lazy-loading and formats,Don't drop raw <img> with no dimensions,Built-in optimization prevents layout shift
+next,dynamic,"dynamic,import,lazy,bundle",dynamic() import heavy or below-fold components,Don't import heavy widgets at module top level,Code-splitting shrinks the initial bundle
+next,env,"env,secret,server,public",Keep secrets server-side; only expose NEXT_PUBLIC_ vars,Don't leak API keys into client components,Anything in the client bundle is public
+shadcn,theming,"theme,css-vars,tokens,dark",Theme via CSS variables in :root and .dark,Don't hardcode colors inside components,CSS-var theming flips dark mode with one class
+shadcn,composition,"compose,primitives,radix,slot",Compose the provided primitives to build features,Don't fork a component just to restyle it,Owning the source means you patch not fight it
+shadcn,install,"cli,init,add,components-json",Install via the CLI after running init,Don't copy-paste component files by hand,The CLI wires aliases and dependencies correctly
+shadcn,variants,"variant,cva,class,style",Add variants with cva instead of conditional class soup,Don't sprinkle inline conditionals for every state,cva centralizes a component's style API
+shadcn,accessibility,"a11y,radix,aria,keyboard",Keep the Radix primitive's built-in a11y wiring,Don't strip aria attributes or focus management,Radix handles roles focus and keyboard for you
+shadcn,overrides,"classname,cn,merge,tailwind",Override styles via className with the cn() merge helper,Don't edit ui/ internals for one-off tweaks,cn() resolves Tailwind conflicts predictably
+swiftui,state,"state,binding,observable,source-of-truth",Use @State for local and @Observable/@Binding for shared,Don't keep one giant source of truth in a parent,Right ownership scope avoids needless view updates
+swiftui,views,"view,struct,subview,composition",Keep views small and compose with ViewBuilder,Don't build a 500-line body,Small views recompute cheaply and read clearly
+swiftui,layout,"layout,stack,frame,geometry",Use stacks and layout priority over fixed frames,Don't hardcode pixel frames for dynamic content,Adaptive layout survives Dynamic Type and rotation
+swiftui,lists,"list,lazy,identifiable,perf",Use List/LazyVStack with Identifiable data,Don't load all rows eagerly in a ScrollView,Lazy containers render only visible rows
+swiftui,accessibility,"a11y,dynamic-type,voiceover,label",Support Dynamic Type and label controls,Don't fix font sizes or ship unlabeled icons,VoiceOver and large type are baseline on iOS
+swiftui,animation,"animation,withanimation,transition,motion",Animate with withAnimation and respect Reduce Motion,Don't animate every state change unconditionally,Honoring Reduce Motion is an accessibility requirement
+flutter,widgets,"widget,stateless,const,compose",Prefer StatelessWidget and const constructors,Don't make everything stateful,const widgets skip rebuilds for free
+flutter,state,"setstate,build,rebuild,scope",Call setState only in callbacks and keep it scoped,Don't call setState during build,Scoped state limits the rebuild subtree
+flutter,layout,"layout,expanded,flex,overflow",Use Expanded/Flexible inside Row and Column,Don't ignore overflow warnings,Flex widgets prevent yellow-stripe overflow
+flutter,lists,"list,builder,lazy,perf",Use ListView.builder for long or infinite lists,Don't build all children up front with ListView(children:),builder lazily constructs only visible items
+flutter,theme,"theme,themedata,colorscheme,tokens",Centralize colors and text in ThemeData,Don't hardcode colors per widget,A single theme keeps light/dark consistent
+flutter,keys,"key,state,reorder,list",Add keys when widget identity matters in lists,Don't omit keys on reorderable stateful items,Keys preserve element state across reorders
+rn,styling,"stylesheet,style,inline,perf",Define styles with StyleSheet.create,Don't pass new inline style objects each render,StyleSheet avoids recreating objects every render
+rn,lists,"flatlist,sectionlist,virtualize,perf",Use FlatList/SectionList for long data,Don't map arrays inside a ScrollView,FlatList virtualizes and recycles rows
+rn,platform,"platform,ios,android,select",Branch platform differences with Platform.select,Don't assume one platform's spacing fits both,iOS and Android have distinct interaction norms
+rn,touch,"touchable,pressable,hitslop,target",Use Pressable with hitSlop for small targets,Don't ship sub-44pt tappable areas,hitSlop expands the touch zone without resizing UI
+rn,navigation,"navigation,react-navigation,stack,deep-link",Use React Navigation with typed routes and deep links,Don't roll a custom navigator from scratch,React Navigation handles gestures and history correctly
+rn,images,"image,fastimage,cache,perf",Cache and size remote images (e.g. FastImage),Don't render full-resolution images unsized,Proper sizing and caching cut memory and jank
