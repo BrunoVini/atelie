@@ -46,7 +46,10 @@ echo "Capturing ${FRAMES} frames @ ${FPS}fps from $IN ..." >&2
 
 node - "$IN" "$TMP" "$FRAMES" "$FPS" <<'NODE'
 const path = require('path');
-const [, , input, outDir, frames, fps] = process.argv;
+// Read the 4 positional args from the END — robust whether or not node keeps the
+// `-` (stdin marker) in argv, which otherwise shifts fixed indices and silently
+// captures 0 frames (→ a cryptic ffmpeg "No such file" on the frame glob).
+const [input, outDir, frames, fps] = process.argv.slice(-4);
 (async () => {
   let browser;
   try { browser = await require('playwright').chromium.launch(); }
@@ -67,6 +70,15 @@ const [, , input, outDir, frames, fps] = process.argv;
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });
 NODE
+
+# --- guard: capture must have produced frames (fail clearly, not via a cryptic
+# ffmpeg "No such file" on the frame glob) -----------------------------------
+CAPTURED=$(find "$TMP" -name 'frame-*.png' | wc -l)
+if [[ "$CAPTURED" -eq 0 ]]; then
+  echo "✗ frame capture produced 0 frames (browser/launch issue) — aborting before ffmpeg." >&2
+  exit 1
+fi
+echo "  captured $CAPTURED frames" >&2
 
 # --- assemble ---------------------------------------------------------------
 if [[ "$OUT" == *.gif ]]; then
