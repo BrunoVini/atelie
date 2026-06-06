@@ -23,6 +23,26 @@ the contract; a deck is just another surface that must match the brand.
 4. Motion: slide-to-slide transitions are fine here (unlike narrated animations,
    which are one continuous motion). Keep them consistent and subtle.
 
+## The narrative carries the deck — design serves the story
+
+A pitch/keynote is judged on its *argument*, not just its surfaces. Two content
+rules that decide whether a deck persuades:
+
+- **The proof/traction slide must be concrete and multi-signal.** One lone abstract
+  number ("9 hours saved") reads as thin. Real launch decks stack *specific*,
+  varied proof: a named funding line ($X seed, lead investor), a recognizable
+  customer/logo wall, AND 3–4 distinct metrics (waitlist, retention, time saved,
+  revenue) — each labeled with its unit and period. Specificity is what sells; a
+  reader believes "$3.1M seed · 1,200 on the waitlist · 94% of questions answered"
+  far more than a single round figure. **Be concrete AND honest at once:** if the
+  numbers are illustrative, you can still show the full multi-signal layout and add
+  a quiet "illustrative beta-cohort figures" footnote — honesty and richness are not
+  a trade-off, and a lean-but-honest slide still loses to a rich-and-honest one.
+- **Hold the problem→solution→how→proof→ask arc** and make each slide advance it;
+  don't let a beautiful slide stall the argument. The closing slide states one clear
+  ask. Keep any section-numbering/eyebrow system consistent and off-by-one-free
+  (number all content sections or none — don't let the CTA read "07" of 8).
+
 ## Export (optional, ask first)
 
 Offer derivatives only if the user wants them. Both exporters need the headless
