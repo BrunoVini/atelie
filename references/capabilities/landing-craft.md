@@ -118,6 +118,14 @@ A marquee interaction that's broken or faked undercuts the whole page on close r
 - **No browser-only properties on focal content.** Avoid WebKit-only tricks like
   `-webkit-text-security` for a hero card's masked digits (renders as literal `X`s in
   Firefox). Use a cross-browser technique (bullet glyphs `•`, SVG, or real masked text).
+- **Use the right ARIA for the widget.** A mutually-exclusive segmented control
+  (monthly/annual, tabs-as-choice) is a `role="radiogroup"`+`role="radio"`/`aria-checked`
+  or a single `role="switch"` — NOT two independent `aria-pressed` buttons (that announces
+  them as unrelated toggles, hiding the either/or). Match the role to the real behavior.
+- **Animate numbers from the canonical value and cancel in-flight tweens.** A count-up must
+  read its start/target from the data attribute, not `el.textContent` (which is mid-tween on
+  rapid re-trigger), and must store + clear its timer per element before starting a new one —
+  otherwise fast toggling races overlapping intervals onto a stale number.
 
 ## Definition of done for a landing surface
 
