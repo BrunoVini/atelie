@@ -1,30 +1,38 @@
 # Knowledge base — source & license
 
-The structured design knowledge in this folder (palettes, font pairings,
-product types, UX guidelines, chart types) is distilled from **ui-ux-pro-max**
-by *nextlevelbuilder*, version 2.5.0.
+The structured design knowledge in this folder (palettes, font pairings, product
+types, UX guidelines, chart recommendations, named styles, stack guidance, cold-start
+reasoning, font substitutes, and brand exemplars) is **original content authored for
+atelier**. It is a curated distillation of established, publicly-known design and
+accessibility principles — color theory, type pairing, WCAG contrast, data-viz best
+practice, and framework idioms — expressed in atelier's own selection and wording.
 
-- **License:** MIT — verified 2026-06-05 from the upstream `plugin.json`
-  (`"license": "MIT"`) and `LICENSE` file.
-- **Decision:** MIT permits vendoring with attribution. We import a **curated,
-  trimmed subset** of the original CSVs (essential columns only) to keep the
-  context footprint small. Attribution is recorded in the README "Credits".
+- **License:** part of atelier; covered by the repository `LICENSE` (Apache-2.0).
+- **Facts vs. expression:** individual data points (e.g. "fintech → navy/trust",
+  "4.5:1 text contrast", a font family name) are facts and carry no copyright. The
+  selection, arrangement, and notes are atelier's own.
 
-To refresh the subset, re-distill from the upstream ui-ux-pro-max plugin's
-`data/` CSVs (in your local plugin cache, or from the upstream repository).
+## Files
 
-## Files & provenance
+| File | Contents |
+|---|---|
+| `palettes.csv` | product-type → role'd color palette (WCAG-conscious) |
+| `typography.csv` | font pairings (display + body) by mood and use case |
+| `products.csv` | product-type → style + landing pattern + considerations |
+| `ux-guidelines.csv` | do/don't UX rules with code examples and severity |
+| `charts.csv` | data type → recommended chart, library, a11y tip |
+| `styles.csv` | named visual styles, where to use/avoid, effects, a11y/perf |
+| `stack-guidance.csv` | framework-idiomatic do/don't (react/next/vue/svelte/…) |
+| `reasoning.csv` | greenfield cold-start aid: pattern + style + mood per category |
+| `font-substitutes.csv` | proprietary face → closest open-source analogue + tracking |
+| `brand-exemplars.csv` | real-brand design languages as cold-start *seeds* only |
 
-Distilled (trimmed) from ui-ux-pro-max's `data/` CSVs: `palettes.csv` (from
-`colors.csv`), `typography.csv` (pairings, fonts confirmed against
-`google-fonts.csv`), `products.csv`, `ux-guidelines.csv` (now with `code_good`/
-`code_bad`), `charts.csv`, `styles.csv` (from `styles.csv`), `stack-guidance.csv`
-(react rows from `react-performance.csv`), and `reasoning.csv` (from
-`ui-reasoning.csv` — the gated greenfield cold-start aid; used only when a repo has
-no design signal, and it still terminates in atelier's DESIGN.md, never a MASTER.md).
+## How it's used
 
-**Authored by atelier** (not from ui-ux-pro-max): `font-substitutes.csv` (a ladder
-from proprietary faces to the closest open-source analogue + weight/tracking, so a
-preview without the licensed font still renders on-brand) and `brand-exemplars.csv`
-(a small corpus of real-brand design languages — Stripe/Linear/Notion/… — as
-cold-start *seeds* for "make it like X", never overriding a repo that already speaks).
+`scripts/search_kb.py` runs a dependency-free BM25 search over these CSVs. The
+knowledge base only **fills gaps** when the empirical scan of a repo is sparse, or
+seeds a direction on greenfield work — the empirical scan always wins when both
+exist, and output still terminates in atelier's `DESIGN.md`.
+
+To extend: add rows in the same schema (keep the `keywords` column), or register a
+new domain in `_DOMAIN_FILE` in `scripts/search_kb.py`.

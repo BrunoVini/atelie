@@ -1,9 +1,8 @@
 # Capability: Live Preview (local port)
 
 Open a local web server the user can view in their browser, serving design output
-with click-to-select interaction. This is atelier's native version of the
-superpowers visual-companion, fed with huashu-quality HTML themed by the repo's
-`DESIGN.md` tokens — so you no longer need two skills to do it.
+with click-to-select interaction. It serves high-fidelity HTML themed by the repo's
+`DESIGN.md` tokens, with click-to-select interaction built in.
 
 **When to open a preview:**
 - The user asks to **see / show / demo** something ("show me", "let's see it",
@@ -84,7 +83,7 @@ reflects the actual design contract:
     body { background: var(--color-background); color: var(--color-foreground);
            font-family: var(--font-body), serif; }
     h1,h2,h3 { font-family: var(--font-display), serif; }
-    /* build with huashu quality + design-philosophy.md (anti-slop) */
+    /* build to spec: design-philosophy.md (anti-slop) */
   </style>
 </head>
 <body><!-- the hi-fi sample --></body>
@@ -178,5 +177,3 @@ scripts/preview/stop.sh "$SESSION_DIR"
 `--project-dir` sessions keep their files for later reference; `/tmp` sessions are
 removed on stop.
 
-> Attribution: the preview server in `scripts/preview/` is adapted from the
-> superpowers visual-companion (MIT) — see "Credits" in the README.

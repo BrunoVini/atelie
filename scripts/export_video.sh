@@ -71,7 +71,7 @@ NODE
 # --- assemble ---------------------------------------------------------------
 if [[ "$OUT" == *.gif ]]; then
   # High-quality GIF: downsample fps, scale (lanczos), per-frame palette (stats_mode
-  # =diff) + Bayer dithering — same quality recipe huashu uses, in one filtergraph.
+  # =diff) + Bayer dithering, in one filtergraph.
   ffmpeg -y -loglevel error -framerate "$FPS" -i "$TMP/frame-%05d.png" -vf \
     "fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
     -loop 0 "$OUT"

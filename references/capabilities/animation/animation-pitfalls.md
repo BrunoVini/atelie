@@ -177,7 +177,7 @@ See `video-export.md` for full script invocation.
 
 ## 11. Don't paint "pseudo-chrome" inside the frame — decorative player UI clashes with real chrome
 
-**The bug**: the animation uses the `Stage` component, which already comes with scrubber + timecode + pause button (these are `.no-record` chrome, auto-hidden on export). I also painted a "`00:60 ──── CLAUDE-DESIGN / ANATOMY`" "magazine page-number-style decorative progress bar" at the bottom of the frame, feeling good about myself. **Result**: the user sees two progress bars — one from the Stage controller, one from my decoration. They visually clash, and it's diagnosed as a bug. "Why is there another progress bar inside the video?"
+**The bug**: the animation uses the `Stage` component, which already comes with scrubber + timecode + pause button (these are `.no-record` chrome, auto-hidden on export). I also painted a "`00:60 ──── ATELIER / ANATOMY`" "magazine page-number-style decorative progress bar" at the bottom of the frame, feeling good about myself. **Result**: the user sees two progress bars — one from the Stage controller, one from my decoration. They visually clash, and it's diagnosed as a bug. "Why is there another progress bar inside the video?"
 
 **Rule**:
 

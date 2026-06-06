@@ -1,8 +1,8 @@
 # Capability: Design Review (screenshot + score)
 
 Critique a design — yours or the user's — by actually *looking at it* (rendered
-screenshots) and scoring it against the contract and craft standards. Fuses
-huashu's screenshot-based expert review with the rigor of adversarial code review.
+screenshots) and scoring it against the contract and craft standards. Pairs
+screenshot-based expert review with the rigor of adversarial code review.
 
 **Use when:** the user asks "is this good?", "review/score this layout", "does
 this look right", or when you doubt your own output and want to QA before

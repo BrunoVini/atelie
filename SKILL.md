@@ -1,7 +1,7 @@
 ---
 name: atelier
 description: Use when building, designing, reviewing, or improving any visual or frontend work — web pages, components, landing pages, dashboards, UI mockups, hi-fi prototypes, interactive demos, slides/decks, animations, narrated/explainer videos — or when the user wants a live preview/demo, design suggestions, a color/typography/style direction, a design review or layout score, a decision between design directions, or a project's design system / DESIGN.md. Triggers (EN): design, prototype, mockup, landing page, dashboard, component, UI, frontend, slides, deck, animation, explainer, variants, review, score this layout, preview, demo, design tokens, style guide, weigh the options, "make it look good", "does this look right". Triggers (PT): design, protótipo, mockup, página, componente, slides, animação, variantes, revisão, pontuar layout, preview, demonstração, decidir direção, "deixa bonito", estilo, paleta.
-license: MIT. See LICENSE; credits in README.
+license: Apache-2.0. See LICENSE.
 ---
 
 # atelier

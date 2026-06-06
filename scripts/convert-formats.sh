@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Convert an MP4 animation to a 60fps MP4 + an optimized GIF (derivatives).
-# Adapted from huashu-design (MIT) — see README "Built on".
 #
 # Usage:
 #   convert-formats.sh input.mp4 [gif_width] [--minterpolate]

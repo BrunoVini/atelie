@@ -26,7 +26,7 @@ the spec. Findings and the fixes applied:
 - `check_drift` exact-hex only → now perceptual (ΔE), near-duplicates don't drift.
 - Spacing & radius were exported but never extracted → `scan_repo` now extracts
   both from CSS.
-- Vendored-server "brainstorm"/superpowers branding → renamed to atelier
+- Vendored-server branding → renamed to atelier
   (`preview-server.cjs`, `start.sh`, `stop.sh`, `frame.html`, `client.js`;
   `ATELIER_*` env vars; `.atelier-preview/`).
 

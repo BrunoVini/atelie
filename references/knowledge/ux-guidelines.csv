@@ -1,55 +1,59 @@
 category,issue,keywords,platform,do,dont,code_good,code_bad,severity
-Accessibility,Color contrast,"contrast,wcag,a11y,readable",All,Meet 4.5:1 for text (3:1 large/UI),Light gray text on white,#333 on white (7:1),#999 on white (2.8:1),critical
-Accessibility,Focus visible,"focus,keyboard,outline,a11y",Web,Keep a visible focus ring,Remove outline with no replacement,focus:ring-2 focus:ring-blue-500,outline-none with no alternative,critical
-Touch,Target size,"touch,tap,44,hit,mobile",Mobile,Min 44x44pt tap targets with spacing,Tiny icon-only taps crowded together,min-h-[44px] min-w-[44px],w-6 h-6 buttons,critical
-Touch,Icon button labels,"icon,aria,label,accessibility",All,Give icon-only buttons an accessible name,Bare icon with no label,"aria-label=""Close menu""",<button><Icon/></button>,important
-Performance,Image format,"image,webp,avif,lazy,performance",Web,Serve WebP/AVIF and lazy-load below fold,Ship full-size PNGs eagerly,srcset + loading='lazy',4000px image for 400px slot,important
-Layout,Layout shift,"cls,shift,reserve,jank",Web,Reserve space for images/embeds (CLS<0.1),Inject content that pushes layout,aspect-ratio or fixed height,No dimensions on images,important
-Animation,Reduced motion,"motion,reduced,prefers,a11y",Web,Honor prefers-reduced-motion,Force large motion on everyone,@media (prefers-reduced-motion: reduce),No motion query check,important
-Animation,Timing,"duration,easing,150,300,snappy",All,UI transitions 150-300ms with easing,Slow 1s+ transitions on every action,transition-all duration-200,duration-1000,polish
-Forms,Visible labels,"label,placeholder,form,field",All,Persistent visible labels per field,Placeholder-as-label only,"<label for=""email"">Email</label>","placeholder=""Email"" only",important
-Forms,Error proximity,"error,validation,inline,form",All,Show errors next to the field,One generic error at the top,Error under each field,All errors at form top,polish
-Navigation,Bottom nav count,"nav,bottom,tabs,mobile",Mobile,Keep bottom nav to <=5 items,Seven crammed tabs,<=5 tab items,7+ crammed tabs,polish
-Feedback,Loading state,"loading,skeleton,spinner,feedback",All,Show skeletons/feedback for async work,Frozen UI with no signal,animate-pulse skeleton,Blank screen while loading,important
-Accessibility,Color only,"color,icon,error,success,a11y",All,Pair color with icon or text,Red/green only for status,Red text + error icon,Red border only for error,important
-Accessibility,Alt text,"alt,image,screenreader,a11y",All,Descriptive alt for meaningful images,Empty or missing alt,"alt=""Dog playing in park""","alt="""" on content image",important
-Accessibility,Heading hierarchy,"heading,h1,h2,semantic,a11y",Web,Use sequential heading levels,Skip levels or fake with styling,h1 then h2 then h3,h1 then h4,polish
-Accessibility,Form labels,"label,input,for,a11y,form",All,Bind label with for or wrap input,Placeholder-only inputs,"<label for=""email"">","placeholder=""Email"" only",important
-Accessibility,Error announce,"aria,live,alert,error,a11y",All,Use aria-live or role=alert for errors,Visual-only error indication,role='alert',Red border only,important
-Accessibility,Skip link,"skip,link,nav,a11y,keyboard",Web,Provide skip-to-main-content link,No skip link on nav-heavy pages,Skip to main content link,100 tabs to reach content,polish
-Accessibility,Semantic HTML,"semantic,html,screenreader,landmarks",All,Use nav main article landmarks,Div soup with no semantics,<nav> <main> <article>,<div> for everything,polish
-Accessibility,Keyboard nav,"keyboard,tab,order,focus,a11y",Web,Tab order matches visual order,Keyboard traps or stranded elements,Logical tabindex,Unreachable elements,important
-Navigation,Active state,"nav,active,current,highlight",All,Highlight current location,No feedback on current item,text-primary border-b-2,All links same style,polish
-Navigation,Back button,"back,history,navigation,mobile",Mobile,Preserve navigation history,Break browser/app back behavior,history.pushState(),location.replace(),important
-Navigation,Sticky nav offset,"sticky,nav,overlap,offset",Web,Pad body to nav height,Let nav overlap first section,pt-20 (nav h-20),No padding compensation,polish
-Navigation,Smooth scroll,"scroll,smooth,anchor,navigation",Web,Use scroll-behavior smooth for anchors,Hard jump with no transition,html { scroll-behavior: smooth; },"<a href=""#x""> with no CSS",polish
-Interaction,Loading buttons,"button,loading,double-submit,feedback",All,Disable button and show loading state,Allow multiple clicks while processing,disabled={loading} + spinner,Button clickable while loading,important
-Interaction,Active state,"active,pressed,feedback,interaction",All,Add pressed/active visual change,No feedback during press,active:scale-95,No active state,polish
-Interaction,Disabled state,"disabled,opacity,cursor,interaction",All,Dim and change cursor when disabled,Disabled looks identical to enabled,opacity-50 cursor-not-allowed,Same style as enabled,polish
-Interaction,Confirm destructive,"confirm,delete,irreversible,dialog",All,Confirm before irreversible actions,Delete instantly on click,Are-you-sure modal,Direct delete on click,important
-Interaction,Hover feedback,"hover,cursor,clickable,interaction",Web,Cursor + subtle change on hover,No hover feedback on clickables,hover:bg-gray-100 cursor-pointer,No hover style,polish
-Feedback,Error recovery,"error,recovery,retry,feedback",All,Give a clear next step on error,Error with no recovery path,Try again button + help link,Error message only,polish
-Feedback,Empty states,"empty,zero,placeholder,feedback",All,Helpful message plus an action,Blank empty screens,No items yet. Create one!,Empty white space,polish
-Feedback,Success feedback,"success,toast,confirm,feedback",All,Confirm completed actions,Silent success,Saved successfully toast,No confirmation,polish
-Feedback,Toast dismiss,"toast,dismiss,timeout,feedback",All,Auto-dismiss after 3-5s,Toasts that never disappear,Auto-dismiss toast,Persistent toast,polish
-Feedback,Progress steps,"progress,steps,wizard,feedback",All,Show step or progress indicator,No sense of progress,Step 2 of 4 indicator,No step information,polish
-Forms,Inline validation,"validation,blur,inline,form",All,Validate on blur for most fields,Validate only on submit,onBlur validation,Submit-only validation,polish
-Forms,Input types,"inputmode,type,email,number,form",All,Use email tel number url inputmode,Plain text input for everything,"type=""email"" inputmode=""numeric""","type=""text"" for email",polish
-Forms,Autofill,"autocomplete,autofill,form",Web,Set autocomplete attributes,Block or disable autofill,"autocomplete=""email""","autocomplete=""off"" everywhere",polish
-Forms,Required indicator,"required,asterisk,form",All,Mark required fields clearly,Make users guess what is required,* required indicator,Guess which are required,polish
-Forms,Submit feedback,"submit,loading,success,form",All,Loading then success or error state,No feedback after submit,Loading -> Success message,Click with no response,important
-Forms,Password visibility,"password,show,toggle,form",All,Offer a show/hide toggle,Always-hidden password,Show/hide password button,Password always hidden,polish
-Layout,Z-index scale,"zindex,stacking,layer,layout",Web,Use a defined z-index scale,Arbitrary huge z-index values,z-10 z-20 z-50,z-[9999],important
-Layout,Viewport units,"vh,dvh,mobile,chrome,layout",Web,Use dvh for full-screen mobile,Use 100vh on mobile,min-h-dvh,h-screen on mobile,polish
-Layout,Line length,"width,prose,readability,layout",Web,Cap text width at 65-75ch,Full-viewport-width paragraphs,max-w-prose,Full width paragraphs,polish
-Typography,Line height,"line-height,leading,readability,type",All,Use 1.5-1.75 for body text,Cramped or excessive leading,leading-relaxed (1.625),leading-none (1),polish
-Typography,Body size mobile,"font-size,16,mobile,readable,type",All,Minimum 16px body text on mobile,Tiny body text,text-base or larger,text-xs for body,important
-Typography,Font loading,"font,swap,fallback,fout,type",Web,Use font-display swap with fallback,Invisible text during font load,font-display: swap,FOIT with no fallback,polish
-Responsive,Mobile first,"responsive,mobile,breakpoint,layout",Web,Start mobile then layer breakpoints,Desktop-first with max-width hacks,Default mobile + md: lg:,Desktop default + max-width queries,polish
-Responsive,Horizontal scroll,"overflow,scroll,viewport,responsive",Web,Ensure content fits viewport width,Content wider than viewport,max-w-full overflow-x-hidden,Horizontal scrollbar on mobile,important
-Responsive,Viewport meta,"viewport,meta,scale,responsive",Web,Set width=device-width initial-scale=1,Missing or wrong viewport meta,"<meta name=""viewport"" ...>",No viewport meta tag,important
-Performance,Auto-play video,"video,autoplay,bandwidth,sustainability",Web,Click-to-play or pause off-screen,Auto-play high-res video loops,playsInline muted preload='none',autoplay loop,polish
-AI Interaction,Streaming,"ai,streaming,token,typewriter,feedback",All,Stream the response token by token,Spin for 10s before showing text,Typewriter streaming effect,Spinner until 100% complete,polish
-AI Interaction,Disclosure,"ai,disclaimer,label,trust",All,Clearly label AI-generated content,Present AI output as human,AI Assistant label,Fake human name with no label,important
-Content,Truncation,"truncate,ellipsis,clamp,content",All,Truncate with ellipsis and expand,Overflow or broken layout,line-clamp-2 with expand,Text overflows container,polish
-Search,No results,"search,empty,suggestions,results",Web,Show no-results with suggestions,Blank screen or bare 0 results,Try searching for X instead,No results found.,polish
+Accessibility,Color contrast,"contrast,wcag,readability,ratio",All,Keep body text at 4.5:1 or higher against its background,Place light gray text on white,#333 on white (12.6:1),#bbb on white (1.9:1),critical
+Accessibility,Focus visible,"focus,keyboard,outline,visible",All,Show a clear focus ring on every interactive element,Strip the focus outline for looks,focus-visible:ring-2,outline:none,critical
+Accessibility,Alt text,"alt,image,screenreader,semantics",All,Describe the meaning of informative images,Leave alt empty on meaningful images,"alt=""Sales up 12%""","alt=""""",high
+Accessibility,Semantic landmarks,"landmark,nav,main,structure",Web,Wrap regions in header main nav and footer,Build the whole page from div soup,<main><nav>,<div class=nav>,high
+Accessibility,Form labels,"label,input,binding,name",All,Associate a visible label with every field,Rely on placeholder text as the label,<label for=email>,placeholder-only,critical
+Accessibility,Reduced motion,"motion,prefers,vestibular,toggle",All,Honor the reduced motion preference,Force large animations on everyone,@media (prefers-reduced-motion),always animate,high
+Accessibility,Text resize,"zoom,rem,scaling,legibility",All,Use relative units so text scales with zoom,Lock font sizes in fixed pixels,font-size:1rem,font-size:12px !important,medium
+Accessibility,ARIA restraint,"aria,role,native,semantics",Web,Prefer native elements before adding ARIA,Reinvent a button from a div and role,<button>,"<div role=""button"">",medium
+Forms,Inline validation,"validation,error,inline,blur",All,Validate on blur and explain how to fix it,Reveal all errors only after submit,validate onBlur,alert on submit,high
+Forms,Error messaging,"error,message,clarity,recovery",All,State the problem and the fix in plain words,Show a generic invalid input message,"""Email needs an @""","""Error""",high
+Forms,Required fields,"required,optional,marker,brevity",All,Mark required fields and keep forms short,Make every field required by default,aria-required=true,all fields required,medium
+Forms,Input types,"input,type,keyboard,mobile",Mobile,Set input type so the right keyboard appears,Use plain text for email and phone,type=email,type=text,medium
+Forms,Autocomplete,"autocomplete,autofill,address,speed",All,Add autocomplete hints for known fields,Block autofill on common fields,autocomplete=email,autocomplete=off,medium
+Forms,Submit guard,"submit,disable,double,pending",All,Disable submit while the request is pending,Let users double submit a form,disabled while pending,no guard,high
+Forms,Password reveal,"password,reveal,toggle,visibility",All,Offer a show-password toggle,Hide the password with no way to check,toggle reveal,masked only,low
+Navigation,Active state,"active,current,nav,location",All,Mark the current page in the navigation,Leave users guessing where they are,aria-current=page,no current marker,medium
+Navigation,Breadcrumbs,"breadcrumb,hierarchy,context,path",Web,Show breadcrumbs for deep hierarchies,Drop users deep with no path back,Home / Docs / API,no trail,low
+Navigation,Back behavior,"back,history,state,scroll",All,Preserve scroll and state on back,Reset the page on every back press,restore scroll,scroll to top,medium
+Navigation,Skip link,"skip,keyboard,bypass,focus",Web,Provide a skip-to-content link first,Force tabbing through every menu item,Skip to content,no skip link,medium
+Navigation,Menu depth,"menu,depth,nesting,findability",All,Keep navigation to two or three levels,Bury items four menus deep,2-level menu,5-level menu,medium
+Feedback,Success confirmation,"success,confirm,toast,signal",All,Confirm that an action actually succeeded,Leave the user unsure it worked,"toast: ""Saved""",silent save,high
+Feedback,Error recovery,"error,retry,recovery,action",All,Offer a clear retry or next step on error,Show a dead-end error with no action,Retry button,error text only,high
+Feedback,Optimistic UI,"optimistic,instant,rollback,latency",All,Reflect the change instantly then reconcile,Freeze the UI until the server replies,update then confirm,block on server,medium
+Feedback,Toast duration,"toast,duration,dismiss,timing",All,Let important messages stay until dismissed,Auto-hide critical messages too fast,dismissible toast,1s auto-hide,medium
+Feedback,Destructive confirm,"delete,confirm,undo,destructive",All,Confirm or offer undo for destructive acts,Delete permanently on one tap,Undo snackbar,instant delete,critical
+Motion,Animation duration,"duration,timing,snappy,purpose",All,Keep UI transitions short and purposeful,Make every transition slow and showy,200ms ease-out,1200ms ease,medium
+Motion,Easing curves,"easing,curve,natural,enter",All,Use ease-out for entering elements,Use linear easing for UI motion,ease-out,linear,low
+Motion,Loading indicator,"spinner,skeleton,progress,wait",All,Show progress for waits beyond a second,Spin forever with no context,skeleton screen,endless spinner,medium
+Motion,Parallax restraint,"parallax,scroll,nausea,subtle",Web,Use scroll effects sparingly and subtly,Stack heavy parallax on every section,subtle 5% shift,full-page parallax,low
+Typography,Line length,"measure,line-length,readability,ch",All,Keep body lines around 60 to 75 characters,Run text the full width of wide screens,max-width:65ch,width:100%,medium
+Typography,Line height,"leading,line-height,spacing,reading",All,Set body line height near 1.5,Pack lines tightly with no leading,line-height:1.5,line-height:1,medium
+Typography,Font size minimum,"font-size,minimum,legibility,mobile",All,Keep body text at least 16px,Shrink body copy below readable size,font-size:16px,font-size:11px,high
+Typography,Type scale,"scale,hierarchy,sizing,rhythm",All,Use a consistent modular type scale,Pick arbitrary sizes per element,1.25 ratio scale,random sizes,low
+Typography,Font loading,"fonts,fout,fallback,swap",Web,Use font-display swap with a fallback,Block render until web fonts load,font-display:swap,font-display:block,medium
+Color,Color meaning,"color,meaning,redundant,status",All,Pair color with text or icons for meaning,Use color alone to convey state,icon + color,color only,high
+Color,Dark mode,"dark-mode,theme,contrast,tokens",All,Test contrast in both light and dark themes,Invert colors and ship it untested,tokens per theme,hard inversion,medium
+Color,Palette limits,"palette,consistency,tokens,limit",All,Constrain the palette to defined tokens,Introduce one-off hex values ad hoc,var(--accent),#3a7bd5 inline,low
+Color,State colors,"state,error,success,semantic",All,Reserve red and green for clear semantics,Use semantic colors decoratively,red=error,red as accent,medium
+Layout,Whitespace,"whitespace,spacing,density,breathing",All,Give content room with consistent spacing,Cram elements edge to edge,padding:24px,padding:2px,medium
+Layout,Spacing scale,"spacing,scale,rhythm,tokens",All,Use a spacing scale like 4 or 8px steps,Use random pixel gaps everywhere,gap:8/16/24,gap:7/13/29,low
+Layout,Alignment,"alignment,grid,consistency,order",All,Align elements to a shared grid,Let elements drift off any grid,12-col grid,free placement,medium
+Layout,Responsive breakpoints,"responsive,breakpoint,fluid,adapt",Web,Design fluid layouts that adapt smoothly,Build only for one fixed width,clamp() sizing,fixed 1280px,high
+Layout,Visual hierarchy,"hierarchy,emphasis,scan,priority",All,Make the primary action the most prominent,Give every button equal weight,one primary CTA,5 equal CTAs,high
+Touch/mobile,Tap target size,"tap,target,touch,size",Mobile,Make tap targets at least 44 by 44px,Place tiny taps close together,min 44x44px,24x24px taps,critical
+Touch/mobile,Thumb reach,"thumb,reach,zone,ergonomics",Mobile,Keep primary actions in the thumb zone,Put key actions in the top corners,bottom action bar,top-right action,medium
+Touch/mobile,Gesture hints,"gesture,swipe,discoverability,hint",Mobile,Reveal hidden gestures with visible cues,Hide core actions behind secret swipes,visible handle,hidden swipe,medium
+Touch/mobile,Viewport zoom,"viewport,zoom,scale,accessibility",Mobile,Allow pinch zoom on mobile pages,Disable user scaling in the viewport,scalable=yes,maximum-scale=1,high
+Loading/states,Empty states,"empty,onboarding,guidance,blank",All,Guide the next step in empty states,Show a blank screen with no content,"""Add your first item""",blank area,medium
+Loading/states,Skeleton screens,"skeleton,placeholder,perceived,shift",All,Show skeletons that match the final layout,Flash a blank then a layout shift,matched skeleton,blank then pop,medium
+Loading/states,Error states,"error,offline,retry,fallback",All,Explain failures and offer recovery,Show a raw stack trace to users,"""Offline - retry""",500 dump,high
+Content/copy,Microcopy clarity,"microcopy,clarity,plain,labels",All,Write button labels that name the action,Use vague labels like submit or ok,"""Create account""","""Submit""",medium
+Content/copy,Tone consistency,"tone,voice,consistency,copy",All,Keep one consistent voice across the app,Mix formal and casual at random,steady voice,mixed tone,low
+Performance,Image optimization,"image,lazy,format,weight",Web,Lazy-load and serve modern image formats,Ship huge unoptimized hero images,loading=lazy webp,2MB png,high
+Performance,Layout shift,"cls,shift,reserve,stability",Web,Reserve space for media to avoid shift,Let late content jump the layout,width/height set,no dimensions,high
+Interaction,Hover dependence,"hover,touch,discoverability,reveal",All,Do not hide essential actions behind hover,Require hover to reveal core actions,always-visible,hover-only,high
+Interaction,Click target,"click,target,affordance,padding",All,Extend the clickable area to the whole control,Make only the tiny icon clickable,full-row click,icon-only hit,medium
+Information density,Progressive disclosure,"disclosure,density,complexity,reveal",All,Reveal advanced options on demand,Dump every option on one screen,collapsible advanced,all at once,medium
+Information density,Table readability,"table,density,scan,spacing",Web,Use spacing and alignment to aid scanning,Pack dense tables with no breathing room,row padding:12px,row padding:1px,low

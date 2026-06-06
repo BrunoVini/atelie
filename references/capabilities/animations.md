@@ -38,8 +38,8 @@ scripts/export_video.sh anim.html out.gif 8 30 960 15          # GIF: 960px-wide
   so frames aren't a fallback-font "raw HTML" render.
 - **GIF** uses the high-quality recipe — downsampled fps + lanczos scale +
   per-frame palette (`stats_mode=diff`) + Bayer dithering, in one filtergraph;
-  defaults to 960px / 15fps for small, shareable files (override via args). This
-  matches huashu's GIF quality.
+  defaults to 960px / 15fps for small, shareable files (override via args). It keeps
+  GIFs crisp at small file sizes.
 - **MP4**: H.264 CRF 18. Then derive the polished forms with one command each:
   ```bash
   scripts/convert-formats.sh out.mp4 960            # -> out-60fps.mp4 + out.gif
@@ -69,8 +69,7 @@ For a live, scrubbable view, serve the HTML through the preview server
 ## Deep craft (read on demand for sophisticated / cinematic work)
 
 For anything beyond a simple reveal — narrated explainers, hero films, multi-scene
-pieces — read the craft references under `capabilities/animation/` (vendored from
-huashu-design, MIT):
+pieces — read the craft references under `capabilities/animation/`:
 
 - **`animation/animation-pitfalls.md`** — the failure modes: fallback-font width
   measurement (wrap DOM measurement in `document.fonts.ready`), first-frame jumps,

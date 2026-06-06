@@ -8,9 +8,8 @@ when it doesn't.
 
 ## 1. Think before you style
 
-Before writing any markup, answer four questions (adapted from huashu's
-"junior designer" discipline — answer them, then let the system serve the
-answers, not the reverse):
+Before writing any markup, answer four questions first, then let the system serve the
+answers, not the reverse:
 
 1. **Purpose** — what problem does this solve, for whom?
 2. **Tone** — commit to ONE bold aesthetic extreme (brutally minimal,

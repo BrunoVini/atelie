@@ -2,14 +2,12 @@
 
 Once an animation HTML is done, users often ask "can you export this as a video?" This guide gives you the full pipeline.
 
-> **atelier script names (this doc is vendored from huashu — map the names):**
-> the actual exporter is **`scripts/export_video.sh`** (`render-video.js` below → it),
-> plus **`scripts/convert-formats.sh`** (60fps + GIF) and **`scripts/add-music.sh`** (BGM).
-> The engine files are **`assets/engines/sprites.jsx`** and **`assets/engines/narration.jsx`**
-> (`animations.jsx` below → those). atelier's `export_video.sh` captures frames by
-> screenshot at a fixed fps; the `window.__recording`/`__seek` handshake described here
-> is the responsibility of a **hand-written Stage** using the narration engine, not of
-> the bundled exporter. Ignore the old `/path/to/claude-design/...` paths — use `scripts/`.
+> **atelier script names:** the exporter is **`scripts/export_video.sh`**, plus
+> **`scripts/convert-formats.sh`** (60fps + GIF) and **`scripts/add-music.sh`** (BGM).
+> The engine files are **`assets/engines/sprites.jsx`** and **`assets/engines/narration.jsx`**.
+> `export_video.sh` captures frames by screenshot at a fixed fps; the
+> `window.__recording`/`__seek` handshake described below is the responsibility of a
+> **hand-written Stage** using the narration engine, not of the bundled exporter.
 
 ## When to Export
 
@@ -43,7 +41,7 @@ Two scripts under `scripts/`:
 Records a 25fps baseline MP4. Depends on globally installed playwright.
 
 ```bash
-NODE_PATH=$(npm root -g) node /path/to/claude-design/scripts/render-video.js <html file>
+node scripts/export_video.sh <html file> <out.mp4>
 ```
 
 Optional flags:
@@ -95,7 +93,7 @@ bash add-music.sh product-promo.mp4 --mood=ad --out=promo-final.mp4
 Derive a 60fps version and a GIF from an existing MP4.
 
 ```bash
-bash /path/to/claude-design/scripts/convert-formats.sh <input.mp4> [gif_width] [--minterpolate]
+bash scripts/convert-formats.sh <input.mp4> [gif_width] [--minterpolate]
 ```
 
 Outputs (same directory as input):

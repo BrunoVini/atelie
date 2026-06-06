@@ -1,6 +1,6 @@
 """Slop check — verify generated output isn't generic AI slop (don't just prompt it).
 
-frontend-design's anti-slop rules are a *prompt*; this makes them a *check* that
+Anti-slop rules are usually just a *prompt*; this makes them a *check* that
 runs on the produced HTML. It covers three layers of the 2026 AI tell-set:
 
   • visual    — overused fonts, the purple/indigo gradient, gratuitous glassmorphism,

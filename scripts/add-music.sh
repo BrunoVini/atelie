@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Mix a BGM track into an MP4 (trim to length, 0.3s fade-in, 1s fade-out).
-# Adapted from huashu-design (MIT) — see README "Built on".
 #
 # Usage:
 #   add-music.sh <input.mp4> [--mood=<name>] [--music=<path>] [--out=<path>]

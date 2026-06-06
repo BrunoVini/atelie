@@ -1,7 +1,7 @@
 # Capability: Design Variants & Direction Picking
 
-Generate 2–4 differentiated design directions and let the user choose — fusing
-huashu's variant canvas with superpowers' parallel fan-out and a scoring jury.
+Generate 2–4 differentiated design directions and let the user choose — a
+parallel fan-out across directions with a scoring jury.
 
 **Use when:** the brief is open ("give me options", "what could this look like"),
 or you're at the start of a design and a direction hasn't been committed.

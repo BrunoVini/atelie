@@ -3,6 +3,6 @@
   "description": "Repo-aware design studio: extracts a DESIGN.md from your codebase and produces prototypes, slides, animations, live previews, and frontend that obey it.",
   "version": "0.1.0",
   "author": { "name": "Bruno Vinicius", "email": "brunovinissouza@gmail.com" },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["design", "design-system", "frontend", "prototype", "design-tokens", "ui", "ux", "preview", "animation", "slides"]
 }
