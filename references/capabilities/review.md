@@ -173,6 +173,20 @@ decorative wash** (a soft radial blob whose opaque center is off-canvas) with th
 real text** is a defect — fix it. Don't let "it's decorative" auto-clear the check; prove it by
 looking.
 
+**Clearing this flag takes EVIDENCE, not an assertion — this is where the check is most often
+defeated.** To clear a `◦ verify deco-over-text` you MUST (1) paste the `responsive_check.mjs`
+line verbatim, and (2) name the exact words sitting under the decoration and state they are fully
+legible in a screenshot you actually opened. None of these clear it — they are the documented
+failure mode, not a verdict: *"it's intentional layering,"* *"a layered collage,"* *"a brand motif
+placed on purpose,"* *"the designer / the mockup approved this look,"* *"it's craft, not a defect."*
+Approving a *motif* is not approving a *build that renders that motif on top of the copy* — catching
+exactly that drift between the approved look and what the browser paints is the whole job of this
+gate. And **"I looked, the text is readable" is not acceptable on its own**: if you can't quote the
+covered words and say they read cleanly, you didn't look — you asserted. Default: an **opaque fill**
+(no edge-transparency) overlapping a text box is a defect until you have proven legibility; the
+burden is on legibility, never on intent. (Letter vs spirit: waving the flag through on intent is
+violating the rule, however principled the story.)
+
 The sweep reports **element collisions** (text sitting on top of text) as well as
 overflow. When you find one — or spot one by eye — do not "fix" it with a blind
 nudge (a margin bump, a `top` tweak, a `z-index` bump). That hides it at one width

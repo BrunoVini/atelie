@@ -181,6 +181,8 @@ scripts/preview/start.sh --project-dir /path/to/repo
 | "The user just wants suggestions, skip the preview" | Suggestions are exactly when a live preview helps — open it (preview.md). |
 | "I'll show one option, that's enough" | When the user is choosing a direction, show variants side by side. |
 | "Tokens are overkill, prose is fine" | Prose can't be enforced. Export tokens so the contract lives in code. |
+| "The overlap is intentional layering / an approved brand motif / craft" | A `◦ verify deco-over-text` flag is NOT cleared by intent. Paste the sweep line, name the covered words as legible, or fix it. Approving a motif ≠ approving a build that paints it over the copy. |
+| "I looked, the text is still readable" | If you can't quote the covered words as legible, you asserted — you didn't look. An opaque fill over text is a defect until legibility is proven. |
 
 ## Conventions
 
