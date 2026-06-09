@@ -534,3 +534,22 @@ def test_lint_repo_flags_rogue_color_and_font(tmp_path):
     assert ("color", "#ff00ff") in kinds
     assert ("font", "Comic Sans MS") in kinds
     assert not any(f["value"] == "#0b3d2e" for f in findings)  # contract color is clean
+
+
+def test_lint_flags_oklch_off_contract(tmp_path):
+    # D1: lint must see every format the scan parses — an oklch color far from the
+    # palette should drift, not slip through invisibly.
+    from lint_design import lint_repo
+    (tmp_path / "design").mkdir()
+    (tmp_path / "design" / "design-tokens.json").write_text('{"colors":{"ink":"#111111","paper":"#ffffff"}}')
+    (tmp_path / "a.css").write_text("a{color:oklch(0.7 0.2 30)}")   # a saturated orange, off-palette
+    findings = lint_repo(str(tmp_path), str(tmp_path / "design" / "design-tokens.json"))
+    assert any("oklch" in f.get("value", "") for f in findings)
+
+
+def test_slop_flags_tailwind_purple_gradient():
+    # D1: the purple gradient now also surfaces as a Tailwind utility, not only as
+    # a literal linear-gradient(...).
+    from slop_check import check_html
+    html = '<div class="bg-gradient-to-r from-violet-600 to-indigo-600">x</div>'
+    assert "purple-gradient" in {f["kind"] for f in check_html(html)}

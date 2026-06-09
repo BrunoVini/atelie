@@ -32,6 +32,8 @@ _SLOP_FONTS = {"inter", "roboto", "arial", "helvetica", "system-ui",
 _PURPLE = re.compile(
     r"linear-gradient\([^)]*(purple|indigo|violet|#a855f7|#8b5cf6|#7c3aed|#6d28d9|"
     r"#6366f1|#4f46e5|#9333ea|#7e22ce|#667eea|#764ba2|rebeccapurple)", re.I)
+# Tailwind utility gradient in the same family (bg-gradient-to-r from-violet-600 …).
+_TW_PURPLE_GRADIENT = re.compile(r"\b(?:from|via|to)-(?:violet|indigo|purple|fuchsia)-\d{2,3}\b", re.I)
 _FONT_DECL = re.compile(r"font-family\s*:\s*([^;{}]+)", re.I)
 _GFONT = re.compile(r"family=([A-Za-z0-9+]+)", re.I)
 _BACKDROP = re.compile(r"backdrop-filter\s*:\s*blur", re.I)
@@ -319,7 +321,9 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
             break
 
     # 2. The purple/indigo gradient hero — the previous era's most recognizable tell.
-    if _PURPLE.search(html):
+    #    Both as a literal linear-gradient(...) AND as a Tailwind utility gradient
+    #    (from-/via-/to-violet|indigo|purple|fuchsia) — same slop, different syntax.
+    if _PURPLE.search(html) or _TW_PURPLE_GRADIENT.search(html):
         findings.append({"severity": "important", "kind": "purple-gradient",
                          "detail": "purple/indigo gradient — the signature generic-AI look"})
 

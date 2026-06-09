@@ -60,8 +60,27 @@ def _from_tokens_json(path):
             "depth": depth if isinstance(depth, str) else None}
 
 
+# B1: the canonical machine block — the contract embedded as fenced JSON. Parsed FIRST,
+# so the "enforceable" half of the thesis doesn't rest on regex-harvesting prose.
+_CONTRACT_BLOCK = re.compile(r"```[^\n]*atelier-contract[^\n]*\n(.*?)\n```", re.S)
+
+
 def _from_design_md(path):
     text = open(path, encoding="utf-8").read()
+    m = _CONTRACT_BLOCK.search(text)
+    if m:
+        try:
+            block = json.loads(m.group(1))
+            return {
+                "source": path,
+                "colors": {k: _norm_hex(v) for k, v in (block.get("colors") or {}).items()
+                           if isinstance(v, str) and v.startswith("#")},
+                "fonts": list(block.get("fonts") or []),
+                "spacing": [str(s) for s in (block.get("spacing") or [])],
+                "depth": block.get("depth") if isinstance(block.get("depth"), str) else None,
+            }
+        except Exception:
+            pass   # malformed block -> fall back to prose parsing below (never silently empty)
     colors = {}
     for line in text.splitlines():
         # Skip WCAG/contrast prose notes — their hexes are examples, not palette roles.
@@ -168,6 +187,35 @@ def unresolved_references(design_text, contract):
     return bad
 
 
+def validate_contract(contract):
+    """B2: report what parsed and whether it's viable to ENFORCE, instead of silently
+    degrading lint to noise/silence on a contract that barely parsed. Returns
+    (ok, report)."""
+    colors = contract.get("colors", {})
+    fonts = contract.get("fonts", [])
+    issues = []
+    if len(colors) < 2:
+        issues.append(f"only {len(colors)} color role(s) parsed — too thin to lint drift "
+                      "(check the DESIGN.md palette table or add an atelier-contract block)")
+    if not fonts:
+        issues.append("no fonts parsed — typography can't be enforced")
+    report = {
+        "source": contract.get("source"),
+        "colors": len(colors), "fonts": len(fonts), "spacing": len(contract.get("spacing", [])),
+        "depth": contract.get("depth"), "issues": issues, "ok": not issues,
+    }
+    return (not issues), report
+
+
 if __name__ == "__main__":
     import sys
-    print(json.dumps(resolve_contract(sys.argv[1] if len(sys.argv) > 1 else "."), indent=2))
+    args = [a for a in sys.argv[1:] if a]
+    if "--validate" in args:
+        target = next((a for a in args if not a.startswith("-")), ".")
+        ok, rep = validate_contract(resolve_contract(target))
+        print(json.dumps(rep, indent=2))
+        for i in rep["issues"]:
+            print("  ⚠", i)
+        print("contract:", "OK" if ok else "TOO THIN")
+        sys.exit(0 if ok else 1)
+    print(json.dumps(resolve_contract(args[0] if args else "."), indent=2))

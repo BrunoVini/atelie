@@ -78,6 +78,26 @@ if __name__ == "__main__":
         print(f"::error:: no contract for {contract} — need design/design-tokens.json or "
               "DESIGN.md (run generate-design-md first)")
         sys.exit(2)
+
+    # Drift ratchet (B3): adopt the gate on a legacy repo by baselining current drift,
+    # then let it only shrink. `--update-baseline` records the current count;
+    # `--ratchet` fails only when drift rises ABOVE the recorded baseline.
+    if "--update-baseline" in args or "--ratchet" in args:
+        drift_now = len(lint_repo(repo, contract))
+        os.makedirs(os.path.join(repo, "design"), exist_ok=True)
+        full_cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
+        baseline = full_cfg.get("check", {}).get("drift_baseline", 0)
+        if "--update-baseline" in args:
+            full_cfg.setdefault("check", {})["drift_baseline"] = drift_now
+            with open(cfg_path, "w") as f:
+                json.dump(full_cfg, f, indent=2)
+            print(f"atelier ratchet: baseline set to {drift_now} drift finding(s).")
+            sys.exit(0)
+        ok = drift_now <= baseline
+        print(f"atelier ratchet: drift {drift_now} vs baseline {baseline} — "
+              f"{'PASS' if ok else 'FAIL (new drift introduced; fix it or --update-baseline)'}")
+        sys.exit(0 if ok else 1)
+
     res = run(repo, contract, max_drift, allow_contrast, max_overlap)
     for s in res["steps"]:
         print(f"  [{'PASS' if s['ok'] else 'FAIL'}] {s['step']}: {json.dumps({k:v for k,v in s.items() if k not in ('step','ok')})}")

@@ -9,6 +9,18 @@
 >      token source does atelier generate `design/` tokens; then regenerate them
 >      after editing the palette/type/spacing below. -->
 
+<!-- atelier reads this canonical block FIRST (it's the machine-readable contract);
+     the prose below is for humans. Keep them in sync — or delete this block to let
+     the tools parse the prose tables. Run `contract.py --validate <repo>` to check. -->
+```json atelier-contract
+{
+  "colors": { "primary": "{{COLOR_PRIMARY}}", "ink": "{{COLOR_INK}}", "paper": "{{COLOR_PAPER}}" },
+  "fonts": ["{{FONT_DISPLAY}}", "{{FONT_BODY}}"],
+  "spacing": [{{SPACING_SCALE}}],
+  "depth": "{{DEPTH_STRATEGY}}"
+}
+```
+
 ## 1. Identity & tone
 - **Product type:** {{PRODUCT_TYPE}}
 - **Audience:** {{AUDIENCE}}
