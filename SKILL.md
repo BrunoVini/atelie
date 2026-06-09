@@ -79,6 +79,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | The user wants… | Read | Key scripts |
 |---|---|---|
 | A DESIGN.md / design system / "map our design" | `references/workflows/generate-design-md.md` | `scan_repo.py`, `export_tokens.py` |
+| Measure what users actually SEE (paint-weighted), reconcile vs the static scan | `references/workflows/generate-design-md.md` | `scan_rendered.mjs` |
 | Is the repo too inconsistent to auto-generate a contract? | `references/workflows/generate-design-md.md` | `assess.py` |
 | "Make it like this" / import a reference / cold start | `references/workflows/generate-design-md.md` | `import_reference.py` |
 | Survey the frontend architecture before writing code | `references/workflows/architecture-fit.md` | `survey_repo.py` |
