@@ -103,6 +103,10 @@ of this initial pre-release; nothing has shipped under a version tag yet.
   responsive sweep.
 - Chart-legibility mechanical gate — an illegible or collision-prone chart fails the
   review; ASCII previews are the default when no live/HTML preview is available.
+- One `qa.py` entry point for the whole self-QA battery (slop, contrast, overlap,
+  responsive sweep, chart legibility) — emits a single verdict plus a machine-readable
+  evidence block. A check that crashed or found no browser is reported as `unknown` and
+  never gates (never trust a null you can't explain).
 
 #### Tooling & capture
 
