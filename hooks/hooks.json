@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/atelier-collision-gate.py\"",
+            "timeout": 240,
+            "statusMessage": "atelier: checking for layout collisions…"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/atelier-collision-gate.py\"",
+            "timeout": 240,
+            "statusMessage": "atelier: checking for layout collisions…"
+          }
+        ]
+      }
+    ]
+  }
+}

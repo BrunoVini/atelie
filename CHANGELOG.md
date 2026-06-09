@@ -107,6 +107,10 @@ of this initial pre-release; nothing has shipped under a version tag yet.
   responsive sweep, chart legibility) — emits a single verdict plus a machine-readable
   evidence block. A check that crashed or found no browser is reported as `unknown` and
   never gates (never trust a null you can't explain).
+- Collision Stop/SubagentStop gate now ships in the plugin (`hooks/hooks.json`,
+  `${CLAUDE_PLUGIN_ROOT}`): the harness blocks finishing while just-generated HTML has a
+  real rendered collision/overflow, so the self-QA loop is binding for every install — not
+  just the maintainer's machine. Bounded retry budget; a crashed checker never blocks.
 
 #### Tooling & capture
 
