@@ -20,7 +20,14 @@ of this initial pre-release; nothing has shipped under a version tag yet.
   ΔE (including `oklch` / `lab` / `color-mix`), and reads fonts, spacing, radius,
   breakpoints, framework, and component library from stylesheets, Tailwind classes /
   `tailwind.config` / Tailwind v4 `@theme`, `theme.ts`, CSS-in-JS, design-token custom
-  properties, and across a monorepo.
+  properties, `.html` markup (embedded `<style>` / inline styles), and across a monorepo.
+- Color provenance: each measured color now carries the files it lives in and the
+  dominant file's share, so the contract can state evidence ("primary `#2563eb` — 412
+  uses across 9 files") instead of an opaque blob count.
+- Render-grounded measurement (`scan_rendered.mjs`): measures the colors users actually
+  *see*, weighted by on-screen painted area, and reconciles against the static scan —
+  surfacing "declared but not painted" (dead palette) and "painted but not declared"
+  (under-counted real surfaces). A string count can't tell you what carries the design.
 - Consistency-aware contract generation: grades a repo's coherence first, auto-maps a
   coherent repo, and gives a chaotic one per-dimension warnings with the best options
   pre-selected — never writing a confident contract over chaos.

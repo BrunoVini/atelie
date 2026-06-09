@@ -197,3 +197,55 @@ def test_extract_breakpoints_from_media_and_tailwind():
     assert set(extract_breakpoints(cfg)) >= {"640px", "768px", "1280px"}
     # sorted numerically, not lexically
     assert extract_breakpoints("@media(min-width:1280px){} @media(min-width:640px){}") == ["640px", "1280px"]
+
+
+def test_scan_directory_measures_html(tmp_path):
+    # A3: atelier must be able to measure its own .html artifacts and static sites.
+    (tmp_path / "page.html").write_text(
+        '<style>h1{color:#2563eb} body{font-family:Sora,sans-serif}</style><h1>Hi</h1>')
+    report = scan_directory(str(tmp_path))
+    assert "#2563eb" in [c["hex"].lower() for c in report["colors"]]
+    assert "Sora" in report["fonts"]
+
+
+def test_colors_carry_file_provenance(tmp_path):
+    # A2: each color carries which files it came from + the dominant file's share,
+    # so the contract states evidence instead of a blob substring count.
+    (tmp_path / "a.css").write_text("h1{color:#2563eb} p{color:#2563eb} a{color:#2563eb}")
+    (tmp_path / "b.css").write_text(".x{color:#2563eb}")
+    report = scan_directory(str(tmp_path))
+    blue = next(c for c in report["colors"] if c["hex"].lower() == "#2563eb")
+    assert blue["count"] >= 4
+    files = {f["file"] for f in blue["files"]}
+    assert "a.css" in files and "b.css" in files
+    assert 0 < blue["top_file_share"] <= 1
+    assert blue["files"][0]["file"] == "a.css"   # 3 of 4 uses -> dominant file
+
+
+def test_html_entities_and_anchors_are_not_colors(tmp_path):
+    # Regression: HTML numeric entities (&#8212;) and href="#abcdef" must NOT be read as
+    # palette colors — only the page's actual CSS is measured.
+    (tmp_path / "page.html").write_text(
+        '<style>body{background:#0f1115}</style>'
+        '<p>a&#8212;b &#8212; c&#8212;d <a href="#abcdef">x</a> &#160;&#169;</p>')
+    hexes = [c["hex"].lower() for c in scan_directory(str(tmp_path))["colors"]]
+    assert hexes == ["#0f1115"]
+
+
+def test_html_is_not_treated_as_a_token_source(tmp_path):
+    # .html carries design (measured) but is never an authoritative token source —
+    # even when it looks like one (:root + many --vars + a theme-ish name).
+    from scan_repo import detect_token_source
+    (tmp_path / "theme.html").write_text(
+        '<style>:root{--a:#111;--b:#222;--c:#333;--d:#444;--e:#555;'
+        '--f:#666;--g:#777;--h:#888;--i:#999}</style>')
+    assert detect_token_source(str(tmp_path)) is None
+
+
+def test_tailwind_classes_in_html_are_measured(tmp_path):
+    # P1: a Tailwind static site (utilities in class=) must not scan as empty.
+    (tmp_path / "i.html").write_text('<body class="bg-blue-600 p-4 rounded-lg"><h1 class="text-red-500">hi</h1></body>')
+    r = scan_directory(str(tmp_path))
+    hexes = [c["hex"].lower() for c in r["colors"]]
+    assert "#2563eb" in hexes and "#ef4444" in hexes
+    assert "16px" in r["spacing"] and "8px" in r["radius"]

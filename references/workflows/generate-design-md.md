@@ -21,6 +21,21 @@ candidates and the referenced fonts as the existing type choices. Use the
 breakpoints + framework to fill §4's **target surfaces** (responsive / pc-only /
 mobile-only) and fluid strategy — ask the user the target if it's ambiguous.
 
+Each color now carries `files` + `top_file_share` (provenance) — prefer colors that
+are used across many files / carry a high share as palette roles, and treat a color
+that lives in a single low-share file as a candidate one-off, not a role.
+
+**Reconcile with what users actually SEE** — a string count over-weights dead code and
+vendored CSS. If the repo (or the artifact) renders, run the paint-weighted measurement
+and let it arbitrate which static colors are real:
+
+```bash
+node scripts/scan_rendered.mjs <built-page.html|url> --static /tmp/atelier-scan.json
+```
+
+Colors flagged `declared but not painted` are likely dead palette (don't promote them to
+roles); `painted but not in the contract` are real surfaces the static scan under-counted.
+
 ### 1b. Assess consistency — DON'T write a confident contract for a messy repo
 
 ```bash

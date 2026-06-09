@@ -21,7 +21,8 @@ from collections import Counter
 
 # --- color parsing (hex 3/6/8, rgb/rgba, hsl/hsla, oklch/oklab/lab/lch, named) -
 
-_HEX = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b")
+# `(?<!&)` so HTML numeric entities (`&#8212;` → `#8212`) are never read as colors.
+_HEX = re.compile(r"(?<!&)#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b")
 _RGB = re.compile(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)", re.I)
 _HSL = re.compile(r"hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%", re.I)
 # Modern CSS color() functions (Tailwind v4, design tokens). Numbers may carry %.
@@ -207,18 +208,53 @@ def extract_colors(text, delta_e_threshold=8.0):
     representative. Returns [{"hex": "#2563eb", "count": 3}, ...] most-common
     first.
     """
-    counter = Counter(_parse_colors(text))
-    # Greedy perceptual clustering, most-frequent colors seed clusters first.
-    clusters = []  # list of [rep_rgb, total_count]
+    colors, _rep_of = _cluster_colors(Counter(_parse_colors(text)), delta_e_threshold)
+    return colors
+
+
+def _cluster_colors(counter, delta_e_threshold=8.0):
+    """Greedy perceptual clustering (most-frequent colors seed clusters first).
+    Returns (colors, rep_of): colors is [{"hex","count"}] most-common first; rep_of
+    maps each raw rgb -> its cluster's representative hex, so provenance partitions
+    colors by the SAME assignment as the counts (no separate nearest-match pass that
+    could disagree with the totals)."""
+    clusters = []  # list of [rep_rgb, total_count, [member_rgbs]]
     for rgb, n in counter.most_common():
         for cluster in clusters:
             if _delta_e(rgb, cluster[0]) <= delta_e_threshold:
                 cluster[1] += n
+                cluster[2].append(rgb)
                 break
         else:
-            clusters.append([rgb, n])
+            clusters.append([rgb, n, [rgb]])
     clusters.sort(key=lambda c: c[1], reverse=True)
-    return [{"hex": _rgb_to_hex(*rgb), "count": n} for rgb, n in clusters]
+    colors, rep_of = [], {}
+    for rep_rgb, total, members in clusters:
+        rep_hex = _rgb_to_hex(*rep_rgb)
+        colors.append({"hex": rep_hex, "count": total})
+        for m in members:
+            rep_of[m] = rep_hex
+    return colors, rep_of
+
+
+def _attach_color_provenance(colors, file_texts, rep_of):
+    """Mutate each clustered color to carry `files` ([{file, count}], top 8),
+    `file_count`, and `top_file_share` — by mapping each file's raw colors through
+    `rep_of` (the SAME partition as the cluster counts). So the contract states
+    evidence ("primary #2563eb — 412 uses across 9 files") instead of a blob count.
+    `hex`/`count` are unchanged."""
+    acc = {c["hex"]: Counter() for c in colors}
+    for relpath, text in file_texts:
+        for rgb, n in Counter(_parse_colors(text)).items():
+            rep = rep_of.get(rgb)
+            if rep in acc:
+                acc[rep][relpath] += n
+    for c in colors:
+        files = acc[c["hex"]]
+        total = sum(files.values())
+        c["files"] = [{"file": f, "count": n} for f, n in files.most_common(8)]
+        c["file_count"] = len(files)
+        c["top_file_share"] = round(files.most_common(1)[0][1] / total, 3) if total else 0.0
 
 
 # --- font extraction --------------------------------------------------------
@@ -645,7 +681,26 @@ def detect_component_lib(pkg):
 
 _STYLE_EXT = (".css", ".scss", ".sass", ".less")
 _CODE_EXT = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro")
-_SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "out", "coverage"}
+# Markup is measured for the design it carries — so atelier can scan its own .html
+# output and plain static sites — but it is NOT a token source, so it is kept out of
+# _STYLE_EXT (which gates token-source detection).
+_MARKUP_EXT = (".html", ".htm")
+_STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style>", re.I | re.S)
+_INLINE_STYLE = re.compile(r"""style\s*=\s*"([^"]*)"|style\s*=\s*'([^']*)'""", re.I)
+
+
+def _css_from_markup(html):
+    """Extract only the CSS a page declares — embedded <style> blocks + inline `style="…"`
+    attribute values. Feeding raw HTML to the color/font parsers would read body-text
+    numeric entities (`&#8212;`) and `href="#abcdef"` fragments as phantom colors; the
+    design actually lives in the CSS."""
+    parts = _STYLE_BLOCK.findall(html)
+    for a, b in _INLINE_STYLE.findall(html):
+        parts.append(a or b)
+    return "\n".join(parts)
+_SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "out", "coverage",
+              # generated HTML dirs — now relevant since .html is scanned (A3)
+              "htmlcov", "playwright-report", "storybook-static", ".svelte-kit", "site", "_build"}
 _MAX_BYTES = 400_000  # skip giant generated/minified files
 
 
@@ -664,7 +719,7 @@ def scan_directory(root):
       "radius":  ["8px"]
     }
     """
-    style_text, code_text, merged_deps = [], [], {}
+    style_text, code_text, markup_text, file_texts, merged_deps = [], [], [], [], {}
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
         for fn in filenames:
@@ -679,28 +734,52 @@ def scan_directory(root):
                     merged_deps.update(j.get("devDependencies", {}))
                 except Exception:
                     pass
-            elif fn.endswith(_STYLE_EXT) or fn.endswith(_CODE_EXT) or fn.startswith("tailwind.config"):
+            elif (fn.endswith(_STYLE_EXT) or fn.endswith(_CODE_EXT)
+                  or fn.endswith(_MARKUP_EXT) or fn.startswith("tailwind.config")):
                 try:
                     if os.path.getsize(p) > _MAX_BYTES:
                         continue
                     with open(p, encoding="utf-8") as fh:
                         text = fh.read()
-                    (style_text if fn.endswith(_STYLE_EXT) else code_text).append(text)
+                    rel = os.path.relpath(p, root)
+                    if fn.endswith(_MARKUP_EXT):
+                        # Color/font/spacing from the page's CSS only (not body text);
+                        # the raw markup is kept for Tailwind class extraction below.
+                        css = _css_from_markup(text)
+                        style_text.append(css)
+                        markup_text.append(text)
+                        file_texts.append((rel, css))
+                    elif fn.endswith(_STYLE_EXT):
+                        style_text.append(text)
+                        file_texts.append((rel, text))
+                    else:                                   # code (+ tailwind.config)
+                        code_text.append(text)
+                        file_texts.append((rel, text))
                 except Exception:
                     pass
     pkg = {"dependencies": merged_deps}
     style_blob = "\n".join(style_text)
     code_blob = "\n".join(code_text)
+    markup_blob = "\n".join(markup_text)
+    # Tailwind utility classes (bg-blue-600, p-4, rounded-lg…) live in code AND in HTML
+    # class= attributes — feed both to the utility extractors so a Tailwind static site
+    # isn't measured as empty.
+    tw_src = code_blob + "\n" + markup_blob
     token_props = extract_token_props(style_blob + "\n" + code_blob)
 
     # Colors: hex/rgb/hsl/oklch/lab from styles + code (config brand colors, inline
     # styles, `bg-[#hex]`) + default-palette utility classes + `--color-*` token
     # props (Tailwind v4 @theme / design tokens), clustered once.
     color_src = style_blob + "\n" + code_blob
-    extra_named = extract_tailwind_named_colors(code_blob)
-    colors = extract_colors(color_src + "\n"
-                            + " ".join(_rgb_to_hex(*c) for c in extra_named) + "\n"
-                            + " ".join(token_props["colors"]))
+    extra_named = extract_tailwind_named_colors(tw_src)
+    color_counter = Counter(_parse_colors(
+        color_src + "\n"
+        + " ".join(_rgb_to_hex(*c) for c in extra_named) + "\n"
+        + " ".join(token_props["colors"])))
+    colors, rep_of = _cluster_colors(color_counter)
+    # Provenance: which files each clustered color actually lives in (+ dominant share),
+    # using the same partition as the counts.
+    _attach_color_provenance(colors, file_texts, rep_of)
 
     # Fonts: style declarations + Google imports + config/theme fonts + token props.
     fonts = []
@@ -711,11 +790,11 @@ def scan_directory(root):
     # Spacing / radius: CSS values (stylesheets AND CSS-in-JS / inline styles) +
     # Tailwind utility steps + RN unitless + `--space-*`/`--radius-*` token props.
     spacing = _merge_scales(extract_spacing(style_blob + "\n" + code_blob),
-                            extract_tailwind_spacing(code_blob))
+                            extract_tailwind_spacing(tw_src))
     spacing = _merge_scales(spacing, extract_rn_spacing(code_blob))
     spacing = _merge_scales(spacing, token_props["spacing"])
     radius = _merge_scales(extract_radius(style_blob + "\n" + code_blob),
-                           extract_tailwind_radius(code_blob))
+                           extract_tailwind_radius(tw_src))
     radius = _merge_scales(radius, extract_rn_radius(code_blob))
     radius = _merge_scales(radius, token_props["radius"])
 
@@ -724,7 +803,7 @@ def scan_directory(root):
         key=lambda t: int(t[:-2]))
 
     css_shadows = extract_shadows(style_blob + "\n" + code_blob)
-    tw_shadows = [f"shadow-{s}" for s in extract_tailwind_shadows(code_blob)]
+    tw_shadows = [f"shadow-{s}" for s in extract_tailwind_shadows(tw_src)]
     shadows = css_shadows + [s for s in tw_shadows if s not in css_shadows]
 
     report = {
