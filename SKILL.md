@@ -123,6 +123,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Verify output isn't generic AI slop | `references/capabilities/review.md` | `slop_check.py` |
 | Verify a change didn't regress (visual diff) | `references/capabilities/review.md` | `diff_screens.mjs` |
 | Hunt overlaps/collisions across screen sizes (default in any scan/review) | `references/capabilities/review.md` | `responsive_check.mjs`, `overlap_risk.py` |
+| A chart that rendered but is unreadable (data-density / legibility, default in any chart review) | `references/capabilities/review.md` | `chart_legibility.mjs` |
 | A performance / weight budget for a page | `references/capabilities/review.md` | `perf_budget.py` |
 | Check the repo doesn't drift from DESIGN.md (design lint) | `references/workflows/enforce-coherence.md` | `lint_design.py` |
 | Enforce project house rules ("no flyouts, only modals") | `references/workflows/enforce-coherence.md` | `check_rules.py` |
@@ -144,6 +145,7 @@ python3 scripts/slop_check.py <file> --contract <repo|DESIGN.md>   # clean of `i
 python3 scripts/audit_contrast.py <tokens|DESIGN.md>              # AA: 4.5:1 text / 3:1 large
 python3 scripts/overlap_risk.py <dir>                            # static; always
 node scripts/responsive_check.mjs <file|url>                     # overflow+collision (if renderable)
+node scripts/chart_legibility.mjs <file|url>                     # unreadable/over-dense charts (if it has charts)
 ```
 
 Run this loop on your OWN generated output, not just the user's — it routinely catches

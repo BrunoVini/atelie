@@ -75,11 +75,34 @@ repo scan runs the width sweep automatically; overlaps and collisions only appea
 
 ```bash
 node scripts/responsive_check.mjs <page.html|url>   # overflow + text collision + deco-over-text
+node scripts/chart_legibility.mjs <page.html|url>   # charts that rendered but are unreadable (P0)
 ```
-It now also flags **decoration-over-text** (a doodle/badge sitting on copy) as a
-candidate — judge each: a layered collage can be intentional, but a decoration
-drifting onto text in the mid-range is a bug (fix per §3c). When you CAN'T render,
-run `overlap_risk.py` instead (static risk patterns — see the non-visual mode above).
+`responsive_check` also flags **decoration-over-text** (a doodle/badge sitting on copy) as a
+candidate — judge each: a layered collage can be intentional, but a decoration drifting onto
+text in the mid-range is a bug (fix per §3c). `chart_legibility` is the **mechanical backstop
+for the defect a review most often waves through**: a dense chart is one element, so the
+collision sweep never trips on it. It flags sub-pixel marks, marks ≫ axis-labels, and a "top N"
+caption over a chart drawing far more than N — each a P0 (see §3a3). A hard finding there
+**caps the verdict** (§4): you cannot return "strong, 41/50" with an unusable core panel. When
+you CAN'T render, run `overlap_risk.py` (static patterns) and judge chart density by eye.
+
+**Review at real data SCALE, not just the happy path.** A chart that's fine with 12 rows
+becomes an illegible smear at 200; a list that fits 8 names overflows at 200. The single
+most-missed dashboard defect is reviewing the demo-sized state and shipping the real one — so
+render and judge each panel at four data states, and run `chart_legibility`/`responsive_check`
+at the MAX state, not the typical one:
+
+| State | What it catches |
+|---|---|
+| empty / zero | placeholder honesty; layout that doesn't collapse |
+| typical | the happy path |
+| **MAX (max cardinality / volume)** | the smear, the overflow, the unbounded list — the state that breaks |
+| pathological | longest string, biggest number, deepest nesting — does it wrap / truncate / clip |
+
+`seed_content.py` generates the empty/loading/error states; for MAX, mount the panel in
+isolation (preview.md → "When the app can't run standalone") and feed it its highest plausible
+cardinality, then confirm it still labels, aggregates ("+N more"), or scrolls. A panel that only
+works at demo scale is not done.
 
 ## 2. Score — five dimensions, 0–10 each
 
@@ -253,6 +276,11 @@ deco-over-text in §3c).
 "I looked, it's fine on desktop" does not clear this — for the same reason it doesn't clear a
 deco-over-text flag. Name the values you can read, or score it as the functional failure it is.
 
+**Mechanical backstop:** `scripts/chart_legibility.mjs <page|url>` renders and flags sub-pixel
+marks, marks ≫ axis-labels, and "top N" caption vs. rendered-mark mismatch. Run it on any screen
+with charts — like the collision sweep, a prose gate alone leans on the reviewer's mood; a hard
+`ILLEGIBLE` finding here is a P0 that caps the verdict (§4).
+
 ## 3b. Verify the web fonts actually LOADED (not just linked)
 
 A `<link>` to a font is not proof the font rendered. A single typo in a Google Fonts
@@ -290,9 +318,25 @@ A review is only as useful as it is scannable and ordered. Deliver:
   measured evidence (the contrast ratio, the collision width, the slop tell), and the fix at
   its cause — ideally the token/system change, not a one-instance patch.
 
-## 4. Adversarial pass (high-stakes)
+## 4. Adversarial pass — the DEFAULT, not just high-stakes
 
-For important work, run the critique as a skeptic trying to REFUTE that the design
-is good, or escalate to the 5-agent **council** (`references/capabilities/council.md`)
-when the call is hard or the user asks to weigh options. Default to "not done yet"
-if a critical issue is unresolved. Critique the design, never the designer.
+The deepest review failure is **charitable self-review**: reviewing your own build, momentum
+("it rendered, it's basically right") inflates every score and you wave through what a stranger
+would catch in a second. So the adversarial pass is the default, run as a hybrid:
+
+1. **Self-skeptic, every review.** After scoring, do a second pass that tries to REFUTE "this is
+   good." For each dimension you scored ≥7, name the *evidence* — quote the values you can read
+   off each chart, name the words that stay legible under a decoration, cite the contrast ratio.
+   A score you can't back with evidence drops until you can (same burden as §3a3 and §3c).
+2. **Escalate to an INDEPENDENT reviewer** when a mechanical gate fires P0 (`chart_legibility`,
+   a `responsive_check` collision, an `audit_contrast` fail) or the work is high-stakes: dispatch
+   a subagent that sees ONLY the screenshot + the contract — NOT your build rationale and NOT your
+   scores — and ask it to refute the design. An independent look is exactly what self-review's
+   momentum can't give you. (Escalate further to the 5-agent **council**
+   — `references/capabilities/council.md` — when the call is hard or the user asks to weigh options.)
+
+**Verdict ceiling — a P0 caps the total.** A single unresolved P0 (an illegible chart, a hard
+collision, an AA failure on body text, a control that doesn't work) caps the overall verdict: cap
+the relevant dimension at ≤3 and the headline at "not done — P0 open." You cannot return "strong,
+41/50" with an unusable core panel. Default to "not done yet" while a critical issue stands.
+Critique the design, never the designer.
