@@ -339,6 +339,14 @@ A review is only as useful as it is scannable and ordered. Deliver:
 - **Each item: element + measured value + root-cause fix.** Cite the selector/line, the
   measured evidence (the contrast ratio, the collision width, the slop tell), and the fix at
   its cause — ideally the token/system change, not a one-instance patch.
+- **Be exhaustive, and verify every number.** Run the FULL mechanical battery on the target
+  (`slop_check`, `audit_contrast` per text/surface pair, `scan_rendered` for painted-area
+  share, `responsive_check` for the exact breaking width, `lint_design`, `reveal_check`) and
+  fold every result into the punch list — completeness is how a measured critique beats a
+  good-eye one; a missed defect (a responsive overflow, a sub-AA pair, a dead anchor) is a
+  problem-finding miss. And **every cited value must be correct**: re-read the measured number
+  before you write it — a single wrong ratio or width discredits the whole critique and counts
+  against it as much as a missed defect. Flawless + complete beats broad-but-wrong.
 
 ## 4. Adversarial pass — the DEFAULT, not just high-stakes
 
