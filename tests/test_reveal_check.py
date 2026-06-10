@@ -107,3 +107,29 @@ def test_css_scroll_driven_not_false_flagged(tmp_path):
     assert r.returncode == 0, f"pure-CSS scroll reveal must PASS (no JS needed)\n{r.stderr}"
     out = json.loads(r.stdout)
     assert out["finding"] is None, out
+
+
+# JS-gated reveal that NEVER fires with JS on (IO observes the wrong nodes / no safety net) —
+# content sits at opacity:0 with JS ON and ships blank to real users (t02 round 2: 27% blank).
+STUCK_JS_ON = (
+    '<!doctype html><html><head><meta charset="utf-8"><style>'
+    '.js [data-reveal]{opacity:0}[data-reveal].in{opacity:1}'
+    'section{min-height:700px;padding:40px;font:16px system-ui}'
+    '</style><script>document.documentElement.classList.add("js")</script></head><body>'
+    + _BODY.format(r1='data-reveal', r2='data-reveal') +
+    # the observer is wired to a selector that matches nothing, so [data-reveal] never gets .in
+    '<script>const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}));'
+    'document.querySelectorAll(".does-not-exist").forEach(el=>io.observe(el));</script>'
+    '</body></html>'
+)
+
+
+def test_stuck_reveal_with_js_on_is_flagged(tmp_path):
+    p = tmp_path / "stuck.html"
+    p.write_text(STUCK_JS_ON)
+    r = _run(p)
+    if _no_browser(r):
+        return
+    assert r.returncode == 1, f"a reveal that never fires (content opacity:0 with JS on) must FAIL\n{r.stderr}"
+    out = json.loads(r.stdout)
+    assert out["stuck_fraction"] >= 0.15, out

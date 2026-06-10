@@ -44,10 +44,20 @@ by the time the user scrolls to the section. Below-the-fold content then arrives
 <head><script>document.documentElement.classList.add('js')</script></head>
 ```
 ```js
-const io = new IntersectionObserver((es) => es.forEach(e => {
-  if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-}), { threshold: 0.15 });
-document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el));
+const els = document.querySelectorAll('[data-reveal]');
+const reveal = (el) => el.classList.add('in');
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((es) => es.forEach(e => {
+    if (e.isIntersecting) { reveal(e.target); io.unobserve(e.target); }
+  }), { threshold: 0.15 });
+  els.forEach(el => io.observe(el));
+  // SAFETY NET — if the observer never fires for an element (off-screen math, a tall section that
+  // never crosses the threshold, a wiring slip), reveal everything still hidden shortly after load.
+  // Without this, a section can sit at opacity:0 *with JS on* and ship blank to real users.
+  addEventListener('load', () => setTimeout(() => els.forEach(el => { if (!el.classList.contains('in')) reveal(el); }), 1500));
+} else {
+  els.forEach(reveal);   // IO unsupported → show everything immediately
+}
 ```
 ```css
 /* visible by DEFAULT; only hide-then-reveal when JS is present AND motion is allowed */

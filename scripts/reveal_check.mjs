@@ -52,13 +52,17 @@ const COVERAGE_FAIL = 0.6;   // <60% of content visible without JS → important
 // stripped — when stripped, only content that needs no page JS is ever counted visible.
 const SWEEP_PROBE = `(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const hidden = (el) => {
+  // Why an element's text is hidden: 'gone' = display:none / visibility:hidden (intentionally
+  // removed — a closed tab/accordion/modal), 'opacity' = effectively opacity:0 while still laid
+  // out (the reveal mechanism), or null = visible.
+  const reason = (el) => {
+    let opacity = false;
     for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
       const cs = getComputedStyle(n);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return true;
-      if (parseFloat(cs.opacity) <= 0.05) return true;
+      if (cs.display === 'none' || cs.visibility === 'hidden') return 'gone';
+      if (parseFloat(cs.opacity) <= 0.05) opacity = true;
     }
-    return false;
+    return opacity ? 'opacity' : null;
   };
   const els = [];
   for (const el of document.querySelectorAll('body *')) {
@@ -69,7 +73,7 @@ const SWEEP_PROBE = `(async () => {
   }
   try { await (document.fonts ? document.fonts.ready : null); } catch {}
   const seen = new Set();
-  const mark = () => { for (let i = 0; i < els.length; i++) if (!seen.has(i) && !hidden(els[i].el)) seen.add(i); };
+  const mark = () => { for (let i = 0; i < els.length; i++) if (!seen.has(i) && reason(els[i].el) === null) seen.add(i); };
   const docH = () => Math.max(
     document.body ? document.body.scrollHeight : 0,
     document.documentElement ? document.documentElement.scrollHeight : 0,
@@ -79,10 +83,17 @@ const SWEEP_PROBE = `(async () => {
   mark();
   for (let y = 0; y <= docH(); y += step) { window.scrollTo(0, y); await sleep(60); mark(); }
   window.scrollTo(0, docH()); await sleep(140); mark();
-  window.scrollTo(0, 0);
-  let visible = 0, total = 0;
-  for (let i = 0; i < els.length; i++) { total += els[i].t; if (seen.has(i)) visible += els[i].t; }
-  return { visible, total };
+  window.scrollTo(0, 0); await sleep(60);
+  // 'stuck' = text that was NEVER visible across the whole sweep AND is hidden by opacity (a
+  // reveal that never fired), not by display:none/visibility:hidden (intentional). With JS on,
+  // a real user sees this content blank.
+  let visible = 0, total = 0, stuck = 0;
+  for (let i = 0; i < els.length; i++) {
+    total += els[i].t;
+    if (seen.has(i)) { visible += els[i].t; }
+    else if (reason(els[i].el) === 'opacity') { stuck += els[i].t; }
+  }
+  return { visible, total, stuck };
 })()`;
 
 function stripScripts(html) {
@@ -152,30 +163,49 @@ async function main() {
 
     const liveVisible = liveRes.visible;
     const noJsVisible = nojsRes.visible;
+    const liveTotal = liveRes.total || 1;
     const coverage = liveVisible > 0 ? noJsVisible / liveVisible : 1;
-    const trivial = liveVisible < TRIVIAL_CHARS;
-    const fail = !trivial && coverage < COVERAGE_FAIL;
+    const stuckFrac = liveRes.stuck / liveTotal;     // text invisible WITH JS on after a full scroll
+    const trivial = liveVisible < TRIVIAL_CHARS && liveRes.stuck < TRIVIAL_CHARS;
+
+    // Two distinct failures, both important:
+    //  • no-JS gap  — content needs JS to appear (blank for crawlers/print/no-JS).
+    //  • stuck reveal — content stays opacity:0 WITH JS on after scrolling (a reveal that never
+    //    fires: IO not observing it, wrong class, no safety net). Worse — real users see blank.
+    const noJsFail = !trivial && coverage < COVERAGE_FAIL;
+    const stuckFail = liveRes.stuck >= TRIVIAL_CHARS && stuckFrac >= 0.15;
+    const fail = noJsFail || stuckFail;
+    let finding = null;
+    if (stuckFail) {
+      finding = `${Math.round(stuckFrac * 100)}% of text content stays hidden (opacity:0) WITH JavaScript on, ` +
+        `after a full scroll — a reveal that never fires (the IntersectionObserver isn't observing those ` +
+        `elements, the reveal class lands on the wrong node, or there's no fallback). Real users see blank ` +
+        `sections. Put the resting state visible and add a safety net (reveal any not-yet-revealed element ` +
+        `on load/timeout, and if IntersectionObserver is unsupported).`;
+    } else if (noJsFail) {
+      finding = `${Math.round((1 - coverage) * 100)}% of visible text content is hidden without JavaScript ` +
+        `(no-JS coverage ${Math.round(coverage * 100)}%). Content gated behind a scroll-reveal/opacity:0 ` +
+        `with no fallback renders blank for no-JS users, crawlers, print, and every static screenshot. ` +
+        `Gate the hidden state on an 'html.js' class set synchronously in <head> ` +
+        `(.js [data-reveal]{opacity:0}) so content shows without JS; reveals then enhance progressively.`;
+    }
     const out = {
       live_visible_chars: liveVisible,
       nojs_visible_chars: noJsVisible,
+      stuck_chars: liveRes.stuck,
+      stuck_fraction: +stuckFrac.toFixed(3),
       coverage: +coverage.toFixed(3),
       threshold: COVERAGE_FAIL,
-      finding: fail
-        ? `${Math.round((1 - coverage) * 100)}% of visible text content is hidden without JavaScript ` +
-          `(no-JS coverage ${Math.round(coverage * 100)}%). Content gated behind a scroll-reveal/opacity:0 ` +
-          `with no fallback renders blank for no-JS users, crawlers, print, and every static screenshot. ` +
-          `Gate the hidden state on an 'html.js' class set synchronously in <head> ` +
-          `(.js [data-reveal]{opacity:0}) so content shows without JS; reveals then enhance progressively.`
-        : null,
+      finding,
     };
     if (asJson) {
       console.log(JSON.stringify(out, null, 2));
     } else if (fail) {
-      console.error(`✗ reveal_check: ${out.finding}`);
+      console.error(`✗ reveal_check: ${finding}`);
     } else if (trivial) {
       console.error(`✓ reveal_check: page has little text (${liveVisible} chars) — nothing to gate.`);
     } else {
-      console.error(`✓ reveal_check: ${Math.round(coverage * 100)}% of content visible without JS (${noJsVisible}/${liveVisible} chars).`);
+      console.error(`✓ reveal_check: ${Math.round(coverage * 100)}% visible without JS; ${Math.round(stuckFrac * 100)}% stuck-hidden with JS (${liveVisible}/${liveTotal} chars live).`);
     }
     process.exit(fail ? 1 : 0);
   } catch (e) {
