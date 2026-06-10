@@ -51,7 +51,7 @@ async function capture(bp, outPath) {
     page = await browser.newPage();
     await page.setViewport(viewport);
   }
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
   await page.screenshot({ path: outPath, fullPage: true });
   await browser.close();

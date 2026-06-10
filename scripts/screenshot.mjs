@@ -59,7 +59,7 @@ async function withPlaywright() {
     browser = await chromium.launch({ executablePath: bin });
   }
   const page = await browser.newPage({ viewport });
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
   await page.screenshot({ path: outAbs, fullPage });
   await browser.close();

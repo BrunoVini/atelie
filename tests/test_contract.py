@@ -43,7 +43,13 @@ def test_template_machine_block_is_valid_json(tmp_path):
     tmpl = os.path.join(os.path.dirname(__file__), "..", "templates", "DESIGN.md.template")
     text = open(tmpl, encoding="utf-8").read()
     fills = {
-        "{{COLOR_PRIMARY}}": "#2563eb", "{{COLOR_INK}}": "#111111", "{{COLOR_PAPER}}": "#ffffff",
+        "{{COLOR_PRIMARY}}": "#2563eb", "{{ON_PRIMARY}}": "#ffffff",
+        "{{COLOR_SECONDARY}}": "#7c3aed", "{{ON_SECONDARY}}": "#ffffff",
+        "{{COLOR_ACCENT}}": "#ea580c", "{{ON_ACCENT}}": "#ffffff",
+        "{{COLOR_BG}}": "#ffffff", "{{COLOR_FG}}": "#111111",
+        "{{COLOR_MUTED}}": "#f1f5f9", "{{ON_MUTED}}": "#475569",
+        "{{COLOR_BORDER}}": "#e2e8f0",
+        "{{COLOR_DESTRUCTIVE}}": "#dc2626", "{{ON_DESTRUCTIVE}}": "#ffffff",
         "{{FONT_DISPLAY}}": "Sora", "{{FONT_BODY}}": "Inter",
         "{{SPACING_SCALE_JSON}}": '"4px", "8px", "16px", "24px"', "{{DEPTH_STRATEGY}}": "borders-only",
     }
@@ -53,7 +59,11 @@ def test_template_machine_block_is_valid_json(tmp_path):
     d.write_text(text)
     c = resolve_contract(str(d))
     assert c.get("machine_block") is None and not c.get("machine_block_dropped")
-    assert c["colors"]["primary"] == "#2563eb"
+    # the block must carry ALL the §2 palette roles (not just primary), so lint/audit
+    # don't flag the repo's own secondary/accent/border as drift
+    for role in ("primary", "secondary", "accent", "background", "foreground", "muted", "border", "destructive"):
+        assert role in c["colors"], f"machine block dropped role {role}"
+    assert c["colors"]["primary"] == "#2563eb" and c["colors"]["secondary"] == "#7c3aed"
     assert "Sora" in c["fonts"]
     assert c["spacing"] == ["4px", "8px", "16px", "24px"]
     assert c["depth"] == "borders-only"
@@ -101,7 +111,7 @@ def test_agent_prompt_guide_fills_with_no_dangling_placeholders():
     text = open(tmpl, encoding="utf-8").read()
     guide = text[text.index("## 13. Agent Prompt Guide"):]
     fills = {
-        "{{COLOR_PRIMARY}}": "#2563eb", "{{COLOR_INK}}": "#111111", "{{COLOR_PAPER}}": "#ffffff",
+        "{{COLOR_PRIMARY}}": "#2563eb", "{{COLOR_FG}}": "#111111", "{{COLOR_BG}}": "#ffffff",
         "{{PALETTE_REST}}": "accent #ea580c", "{{FONT_DISPLAY}}": "Sora", "{{FONT_BODY}}": "Inter",
         "{{SPACING_SCALE}}": "4 8 16 24px", "{{RADIUS_SCALE}}": "8px", "{{DEPTH_STRATEGY}}": "borders-only",
     }

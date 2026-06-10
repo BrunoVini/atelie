@@ -108,7 +108,7 @@ const PROBE = `(() => {
 try {
   const { b, mk } = await launch();
   const page = await mk();
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
   const { findings } = await page.evaluate(PROBE);
   await b.close();

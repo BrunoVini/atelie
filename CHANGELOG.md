@@ -205,4 +205,21 @@ of this initial pre-release; nothing has shipped under a version tag yet.
 - Relicensed to Apache-2.0 and made atelier fully self-contained — the knowledge base
   was re-authored and all third-party references and watermarks were removed.
 
+### Fixed
+
+- DESIGN.md template's `atelier-contract` block now carries all palette roles (+ `on-*`
+  pairs), so a templated contract no longer hides `secondary`/`accent`/`border` from the
+  lint/contrast gates that parse it; the Agent Prompt Guide uses the canonical
+  `background`/`foreground` placeholders.
+- `palettes.csv` no longer recommends sub-AA-large `on_*` text (12 pairs fixed, including
+  white-on-white) — a seeded palette can't fail atelier's own contrast gate; covered by a
+  new KB-integrity test.
+- The render scripts (`responsive_check` / `chart_legibility` / `diff_screens` /
+  `export_pdf` / `extract_deck` / `screenshot` / `export_video`) no longer crash on a
+  Puppeteer-only machine (Puppeteer rejects `waitUntil:'networkidle'`) — they fall back to
+  `load`, so the binding gate isn't silently disarmed by a checker crash.
+- `synthesize_tokens` returns a soft near-black/near-white (not harsh pure `#000`/`#fff`)
+  on the high-contrast side; `responsive_check` rejects an empty `--widths` instead of
+  "passing" a swept-nothing page; deduplicated review.md's `§3b`/`§3c` headers.
+
 [Unreleased]: https://github.com/BrunoVini/atelier/commits/main

@@ -30,6 +30,10 @@ if (!input) {
 const wi = process.argv.indexOf('--widths');
 const WIDTHS = (wi !== -1 ? process.argv[wi + 1] : '360,768,834,1024,1280,1440,1920')
   .split(',').map(n => parseInt(n, 10)).filter(Boolean);
+if (!WIDTHS.length) {   // a garbage --widths must NOT silently sweep nothing and "pass"
+  console.error('responsive_check: --widths had no valid numeric widths');
+  process.exit(2);
+}
 const url = /^https?:\/\//.test(input) ? input : 'file://' + path.resolve(input);
 const slug = path.basename(input).replace(/\W+/g, '_');
 // Scratch artifacts go to the OS tmp dir — never into the user's repo.
@@ -182,7 +186,7 @@ try {
   let anyOverflow = false, anyCollision = false, anyOpaqueDeco = false, anySoftDeco = false;
   for (const width of WIDTHS) {
     const page = await mk({ width, height: 900 });
-    await page.goto(url, { waitUntil: 'networkidle' });
+    await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
     // Wait for web fonts so the capture reflects the real page, not a fallback-font
     // "raw HTML" render (mirrors huashu's verification discipline).
     await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});

@@ -69,7 +69,7 @@ const browser = lib.chromium
   : await lib.puppeteer.launch();
 const page = await (browser.newPage ? browser.newPage() : (await browser.pages())[0]);
 
-await page.goto(url, { waitUntil: 'networkidle' });
+await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
 // Wait for web fonts so the PDF embeds the real faces, not fallbacks.
 await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
 // Force print media so @media print rules (deck one-slide-per-page) take effect.

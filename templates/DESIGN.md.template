@@ -16,7 +16,15 @@
      comma-separated list, e.g. "4px", "8px", "16px", "24px". -->
 ```json atelier-contract
 {
-  "colors": { "primary": "{{COLOR_PRIMARY}}", "ink": "{{COLOR_INK}}", "paper": "{{COLOR_PAPER}}" },
+  "colors": {
+    "primary": "{{COLOR_PRIMARY}}", "on-primary": "{{ON_PRIMARY}}",
+    "secondary": "{{COLOR_SECONDARY}}", "on-secondary": "{{ON_SECONDARY}}",
+    "accent": "{{COLOR_ACCENT}}", "on-accent": "{{ON_ACCENT}}",
+    "background": "{{COLOR_BG}}", "foreground": "{{COLOR_FG}}",
+    "muted": "{{COLOR_MUTED}}", "on-muted": "{{ON_MUTED}}",
+    "border": "{{COLOR_BORDER}}",
+    "destructive": "{{COLOR_DESTRUCTIVE}}", "on-destructive": "{{ON_DESTRUCTIVE}}"
+  },
   "fonts": ["{{FONT_DISPLAY}}", "{{FONT_BODY}}"],
   "spacing": [{{SPACING_SCALE_JSON}}],
   "depth": "{{DEPTH_STRATEGY}}"
@@ -131,11 +139,11 @@ _WCAG: {{WCAG_NOTES}}_
      on-contract without reading the whole file. Fill from the tokens above with LITERAL
      values, not {token} refs. {{PALETTE_REST}} = the remaining roles, e.g.
      "secondary #… · accent #… · muted #…". Don't hardcode bans here — point at §6. -->
-**Palette (use these literally):** primary `{{COLOR_PRIMARY}}` · ink `{{COLOR_INK}}` · paper `{{COLOR_PAPER}}` · {{PALETTE_REST}}
+**Palette (use these literally):** primary `{{COLOR_PRIMARY}}` · ink `{{COLOR_FG}}` · paper `{{COLOR_BG}}` · {{PALETTE_REST}}
 **Type:** display `{{FONT_DISPLAY}}`, body `{{FONT_BODY}}`. **Spacing:** {{SPACING_SCALE}}. **Radius:** {{RADIUS_SCALE}}. **Depth:** {{DEPTH_STRATEGY}}.
 
 Paste-ready prompts:
-- *Landing section:* "Build a hero on `{{COLOR_PAPER}}` with `{{COLOR_INK}}` text, one `{{COLOR_PRIMARY}}` CTA (loudest pixel at rest), `{{FONT_DISPLAY}}` headline / `{{FONT_BODY}}` body, {{DEPTH_STRATEGY}} depth. Follow the anti-slop rules in §6."
+- *Landing section:* "Build a hero on `{{COLOR_BG}}` with `{{COLOR_FG}}` text, one `{{COLOR_PRIMARY}}` CTA (loudest pixel at rest), `{{FONT_DISPLAY}}` headline / `{{FONT_BODY}}` body, {{DEPTH_STRATEGY}} depth. Follow the anti-slop rules in §6."
 - *Card grid:* "3 cards, {{RADIUS_SCALE}} radius, {{DEPTH_STRATEGY}} elevation, `{{COLOR_PRIMARY}}` only for the primary action; rest/hover/focus states."
-- *Form:* "Stacked form, labels in `{{COLOR_INK}}`, inputs inset, focus ring `{{COLOR_PRIMARY}}`, one explicit save; visible `:focus-visible`."
-- *Nav:* "Top nav, same background as canvas (`{{COLOR_PAPER}}`), a subtle border not a different fill; active item in `{{COLOR_PRIMARY}}`."
+- *Form:* "Stacked form, labels in `{{COLOR_FG}}`, inputs inset, focus ring `{{COLOR_PRIMARY}}`, one explicit save; visible `:focus-visible`."
+- *Nav:* "Top nav, same background as canvas (`{{COLOR_BG}}`), a subtle border not a different fill; active item in `{{COLOR_PRIMARY}}`."

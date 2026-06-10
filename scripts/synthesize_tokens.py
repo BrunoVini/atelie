@@ -20,14 +20,15 @@ def _mix(a, b, t):
 
 
 def _readable(surface, target=4.5):
-    """Best text color for `surface`: prefer a soft near-black/near-white when it clears
-    `target` (less harsh), else fall back to whichever PURE black/white has the most
-    contrast (guaranteed max achievable). Never silently returns a failing color."""
-    options = [_SOFT_DARK, _SOFT_LIGHT, _BLACK, _WHITE]
-    passing = [c for c in options if contrast_ratio(c, surface) >= target]
-    if passing:
-        return max(passing, key=lambda c: contrast_ratio(c, surface))
-    return max(options, key=lambda c: contrast_ratio(c, surface))   # best achievable (e.g. a mid-tone fill)
+    """Best text color for `surface`: the soft near-black/near-white on the HIGHER-contrast
+    side (less harsh than pure) when it clears `target`, escalating to pure black/white when
+    it doesn't. Never silently returns a failing color (returns the best achievable on a
+    mid-tone fill)."""
+    dark_better = contrast_ratio(_BLACK, surface) >= contrast_ratio(_WHITE, surface)
+    soft, pure = (_SOFT_DARK, _BLACK) if dark_better else (_SOFT_LIGHT, _WHITE)
+    if contrast_ratio(soft, surface) >= target:
+        return soft
+    return pure   # pure clears it, or (mid-tone fill) is the max achievable
 
 
 def _muted_text(fg, bg, muted, target=4.5):

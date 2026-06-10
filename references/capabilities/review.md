@@ -303,7 +303,7 @@ marks, marks ≫ axis-labels, and "top N" caption vs. rendered-mark mismatch. Ru
 with charts — like the collision sweep, a prose gate alone leans on the reviewer's mood; a hard
 `ILLEGIBLE` finding here is a P0 that caps the verdict (§4).
 
-## 3b. Verify the web fonts actually LOADED (not just linked)
+## 3d. Verify the web fonts actually LOADED (not just linked)
 
 A `<link>` to a font is not proof the font rendered. A single typo in a Google Fonts
 URL — `opt_sz` instead of `opsz`, a misspelled family, a weight you didn't request —
@@ -325,7 +325,7 @@ await document.fonts.ready;
 If a family is `false`, fix the URL/declaration and re-render — don't ship a deck,
 prototype, or variants page whose intended type silently degraded to a fallback.
 
-## 3c. Structure the critique so it's act-on-able
+## 3e. Structure the critique so it's act-on-able
 
 A review is only as useful as it is scannable and ordered. Deliver:
 - **A scored radar** — rate each dimension (visual hierarchy, typography, color & a11y,

@@ -63,7 +63,7 @@ const [input, outDir, frames, fps] = process.argv.slice(-4);
   if (page.addInitScript) await page.addInitScript(() => { window.__recording = true; });
   else if (page.evaluateOnNewDocument) await page.evaluateOnNewDocument(() => { window.__recording = true; });
   const url = /^https?:\/\//.test(input) ? input : 'file://' + path.resolve(input);
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
   // Wait for web fonts so frames aren't a fallback-font "raw HTML" render.
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
   // Frame-EXACT capture when the page opts into the handshake: __ready (true once

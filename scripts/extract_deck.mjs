@@ -37,7 +37,7 @@ const browser = await chromium.launch();
 
 // First read the deck geometry + slide count + speaker notes.
 const probe = await browser.newPage();
-await probe.goto(url, { waitUntil: 'networkidle' });
+await probe.goto(url, { waitUntil: 'networkidle' }).catch(() => probe.goto(url, { waitUntil: 'load' }));
 await probe.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
 const meta = await probe.evaluate(() => {
   const deck = document.querySelector('deck-stage');
@@ -106,7 +106,7 @@ function extractScript() {
 const slides = [];
 for (let i = 0; i < n; i++) {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
 
   // Drive the deck to slide i and flatten that one slide to a plain, top-left block
