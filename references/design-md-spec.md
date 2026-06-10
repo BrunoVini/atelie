@@ -4,6 +4,16 @@
 extracted *empirically* from the code, and enforceable via exported tokens. It
 lives at the repo root. Generated artifacts must obey it.
 
+## Canonical machine block (parsed first)
+
+Embed the contract as a fenced ```json block tagged `atelier-contract` — the tools
+(`contract.py`, lint, contrast, ratchet) parse **this** first; the prose sections below
+are the human-facing copy and a fallback when the block is absent. It MUST be valid JSON:
+`colors` are hex strings (`{role: "#hex"}`), `fonts` a list, `spacing` a quoted list, `depth`
+a strategy string. Keep the block and prose in sync; `contract.py --validate <repo>` fails
+loudly if the block is malformed (it would otherwise silently fall back to prose). Non-hex
+color values (e.g. `oklch(...)`) aren't yet supported in the block — keep colors as hex.
+
 ## Sections (use the template in `templates/DESIGN.md.template`)
 
 1. **Identity & tone** — inferred product type, audience, and the ONE committed

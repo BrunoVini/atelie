@@ -78,6 +78,53 @@ if __name__ == "__main__":
         print(f"::error:: no contract for {contract} — need design/design-tokens.json or "
               "DESIGN.md (run generate-design-md first)")
         sys.exit(2)
+
+    # Drift ratchet (B3, count-based): adopt the gate on a legacy repo by baselining
+    # current drift; afterwards drift may only shrink. NOTE: count-based, not git-aware —
+    # new drift offset by removed drift can pass; the baseline auto-tightens when drift
+    # drops so it can't creep back up. `--update-baseline` records the current count.
+    if "--update-baseline" in args or "--ratchet" in args:
+        try:
+            full_cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
+        except Exception as e:
+            print(f"::error:: corrupt {cfg_path}: {e}")
+            sys.exit(2)
+        baseline = full_cfg.get("check", {}).get("drift_baseline", 0)
+
+        def _write_baseline(n):
+            os.makedirs(os.path.join(repo, "design"), exist_ok=True)
+            full_cfg.setdefault("check", {})["drift_baseline"] = n
+            with open(cfg_path, "w") as f:
+                json.dump(full_cfg, f, indent=2)
+
+        if "--update-baseline" in args:
+            n = len(lint_repo(repo, contract))
+            _write_baseline(n)
+            print(f"atelier ratchet: baseline set to {n} drift finding(s).")
+            sys.exit(0)
+
+        # --ratchet: the drift gate becomes "<= baseline", but contrast / house-rules /
+        # overlap keep their normal verdicts (don't silently drop three gates).
+        res = run(repo, contract, max_drift=10**9, allow_contrast_fail=allow_contrast,
+                  max_overlap_risk=max_overlap)
+        drift_now = next(s["findings"] for s in res["steps"] if s["step"] == "design-lint")
+        if drift_now < baseline:                       # real improvement -> tighten so it can't creep back
+            try:
+                _write_baseline(drift_now)
+                print(f"atelier ratchet: baseline tightened {baseline} → {drift_now}.")
+                baseline = drift_now
+            except OSError:
+                pass
+        for s in res["steps"]:
+            if s["step"] != "design-lint":
+                print(f"  [{'PASS' if s['ok'] else 'FAIL'}] {s['step']}")
+        ratchet_ok = drift_now <= baseline
+        ok = ratchet_ok and res["ok"]
+        print(f"atelier ratchet: drift {drift_now} vs baseline {baseline} — "
+              f"{'PASS' if ratchet_ok else 'FAIL (new drift; fix or --update-baseline)'}"
+              + ("" if res["ok"] else "; other gates FAILED"))
+        sys.exit(0 if ok else 1)
+
     res = run(repo, contract, max_drift, allow_contrast, max_overlap)
     for s in res["steps"]:
         print(f"  [{'PASS' if s['ok'] else 'FAIL'}] {s['step']}: {json.dumps({k:v for k,v in s.items() if k not in ('step','ok')})}")

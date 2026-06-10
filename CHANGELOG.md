@@ -124,6 +124,19 @@ of this initial pre-release; nothing has shipped under a version tag yet.
 - PR-diff-scoped design review (`pr_review.py`): lints only the lines a PR changed and
   emits GitHub `::warning file=…,line=…::` annotations, so governance lands at the point of
   change instead of flooding a legacy file's pre-existing drift.
+- Canonical machine block in DESIGN.md: the contract can be embedded as a fenced
+  `atelier-contract` JSON block that the tools parse **first** — the prose tables become a
+  human-facing fallback, so the enforceable half of the thesis no longer rests on regex.
+- `contract.py --validate`: reports what parsed (roles, fonts, spacing) and fails loudly
+  when a contract is too thin to enforce, instead of silently degrading lint to noise.
+- Drift ratchet (`check.py --ratchet` / `--update-baseline`): adopt the gate on a legacy
+  repo by baselining current drift; the baseline auto-tightens as drift drops, so it can
+  only shrink. (Count-based for now — a git-line-aware "only new lines must comply" version
+  is deferred. `--ratchet` still runs the contrast / house-rule / overlap gates too.)
+- Lint↔scan colour parity: the design lint now sees `oklch`/`oklab`/`lab`/`lch` colors (not
+  just hex/rgb/hsl), and the slop detector catches the purple gradient as a Tailwind utility
+  (`from-violet-600 …`), not only as a literal `linear-gradient(...)`. (Spacing-scale drift
+  linting and contrast-pairing from the rendered DOM are deferred to a later pass.)
 
 #### Tooling & capture
 

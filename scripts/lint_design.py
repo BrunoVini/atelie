@@ -18,6 +18,7 @@ from scan_repo import (
     _HEX, _RGB, _HSL, _hex_to_rgb, _hsl_to_rgb, _rgb_to_hex, _delta_e,
     _STYLE_EXT, _CODE_EXT, _SKIP_DIRS, _LEN, _FONT_FAMILY, _GENERIC_FONTS,
     _TW_COLOR_CLASS, _TW_COLORS, _SHADOW, _SHADOW_NULL, _TW_SHADOW,
+    _OKLCH, _OKLAB, _LAB, _LCH, _oklch_to_rgb, _oklab_css_to_rgb, _lab_to_rgb, _lch_to_rgb,
 )
 
 DELTA_E = 8.0
@@ -56,6 +57,15 @@ def _iter_colors(line):
         yield (int(r), int(g), int(b)), f"rgb({r},{g},{b})"
     for h, s, l in _HSL.findall(line):
         yield _hsl_to_rgb(h, s, l), f"hsl({h},{s}%,{l}%)"
+    # Parity with scan_repo: modern color formats drift invisibly if lint can't see them.
+    # Mirror _parse_colors' converter/convention exactly (conv(*groups)).
+    for conv, rx in ((_oklch_to_rgb, _OKLCH), (_oklab_css_to_rgb, _OKLAB),
+                     (_lab_to_rgb, _LAB), (_lch_to_rgb, _LCH)):
+        for m in rx.finditer(line):
+            try:
+                yield conv(*m.groups()), m.group(0)
+            except Exception:
+                pass
 
 
 def _depth_findings(file_shadows, tw_shadows, rel, depth):

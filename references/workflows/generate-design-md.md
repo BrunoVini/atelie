@@ -110,6 +110,13 @@ persistent file). The moment real signal exists, the empirical scan wins.
 
 ### 4. Write DESIGN.md — thin contract when the repo already owns its tokens
 
+Start from `templates/DESIGN.md.template`. **Fill the `atelier-contract` machine block**
+(fenced ```json) — it is the canonical, machine-read contract; the tools parse it FIRST and
+the prose tables are the human-facing fallback. It MUST be valid JSON: colors are hex strings,
+`spacing` is a quoted list (`"4px", "8px", …`). After writing, run
+`python3 scripts/contract.py --validate <repo>` — it fails loudly if the contract parsed too
+thin (e.g. the block was malformed and silently fell back to prose).
+
 First check `scan_repo`'s `token_source`. **If it is set** (the repo already owns
 its tokens in a TS/JS theme module, a CSS custom-property theme, or a Tailwind
 config — `kind` + `path`), write a **thin, pointer contract**, not a second copy of
