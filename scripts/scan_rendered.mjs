@@ -23,6 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { driveReveals } from './lib/render.mjs';
 
 const input = process.argv[2];
 if (!input || input.startsWith('-')) {
@@ -134,6 +135,7 @@ function reconcile(rendered, staticColors) {
   }
   try {
     await ctx.page.goto(url, { waitUntil: ctx.idle }).catch(() => ctx.page.goto(url));
+    await driveReveals(ctx.page);   // fire scroll-reveals so painted-area weights reflect the whole page, not just the fold
     const rendered = await ctx.page.evaluate(PROBE);
     const out = { rendered };
     if (staticPath) {

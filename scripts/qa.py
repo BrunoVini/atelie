@@ -109,7 +109,10 @@ def _rendered(path, script, widths=None):
         return CheckResult(script, "unknown", True, {}, "no headless browser — not trusted, did not gate")
     if code == 0:
         return CheckResult(script, "pass", True, {}, "clean")
-    crashed = "responsive_check failed:" in log or "chart_legibility failed:" in log
+    # a checker that crashed prints "<name> failed:" and must NOT gate (it's `unknown`);
+    # a real finding also exits 1 but without that marker.
+    base = os.path.splitext(os.path.basename(script))[0]
+    crashed = f"{base} failed:" in log
     if code == 1 and not crashed:
         return CheckResult(script, "fail", True, {}, log.strip()[-2000:])
     return CheckResult(script, "unknown", True, {}, "(checker crashed; not trusted)")
@@ -149,6 +152,7 @@ def _battery(target, contract, widths, hook):
     if is_html:
         results.append(_rendered(target, "responsive_check.mjs", widths))
         results.append(_rendered(target, "chart_legibility.mjs"))
+        results.append(_rendered(target, "reveal_check.mjs"))   # content must be visible without JS (a11y/crawler/capture honesty)
         if not hook:                                  # full-mode layers (excluded from the blocking hook)
             results.append(_slop(open(target, encoding="utf-8").read(), contract=contract))
             if contract:

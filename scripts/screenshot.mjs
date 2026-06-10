@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { findChrome, findElectron } from './lib/browser.mjs';
+import { driveReveals } from './lib/render.mjs';
 
 const [input, out, w = '1440', h = '900'] = process.argv.slice(2);
 const fullPage = process.argv.includes('--full');
@@ -60,7 +61,7 @@ async function withPlaywright() {
   }
   const page = await browser.newPage({ viewport });
   await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url, { waitUntil: 'load' }));
-  await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
+  await driveReveals(page);   // fonts.ready + scroll-trigger reveals so the comp isn't blank below the fold
   await page.screenshot({ path: outAbs, fullPage });
   await browser.close();
 }
@@ -78,7 +79,7 @@ async function withPuppeteer() {
   const page = await browser.newPage();
   await page.setViewport(viewport);
   await page.goto(url, { waitUntil: 'networkidle0' });
-  await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
+  await driveReveals(page);   // fonts.ready + scroll-trigger reveals so the comp isn't blank below the fold
   await page.screenshot({ path: outAbs, fullPage });
   await browser.close();
 }

@@ -30,9 +30,15 @@ by the time the user scrolls to the section. Below-the-fold content then arrives
 
 - Use an `IntersectionObserver` to reveal each section as it enters the viewport
   (translate-up + fade, ~400–600ms, small per-child stagger).
-- Gate ALL of it behind `@media (prefers-reduced-motion: reduce)` — kill transforms and
-  set final state immediately.
+- **The hidden state MUST be gated on JS being present** — never `opacity:0` on the bare
+  selector. Add `class="js"` to `<html>` from a synchronous inline script in `<head>`, and
+  hide only `.js [data-reveal]`. So no-JS users, crawlers, print, AND every static
+  screenshot see the *content*, not a blank pane; JS only enhances. Also gate inside
+  `prefers-reduced-motion: no-preference` so reduced-motion users get the final state.
 
+```html
+<head><script>document.documentElement.classList.add('js')</script></head>
+```
 ```js
 const io = new IntersectionObserver((es) => es.forEach(e => {
   if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
@@ -40,12 +46,22 @@ const io = new IntersectionObserver((es) => es.forEach(e => {
 document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el));
 ```
 ```css
-[data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+/* visible by DEFAULT; only hide-then-reveal when JS is present AND motion is allowed */
+@media (prefers-reduced-motion:no-preference){
+  .js [data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+}
 [data-reveal].in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none}}
 ```
 
-Ask: *does each section below the fold animate in on scroll (and respect reduced-motion)?*
+The fragile version — `[data-reveal]{opacity:0}` on the bare selector, flipped by JS — is
+the **single most common reason a generated page screenshots blank below the fold** (the
+reveal never fires without a scroll event; no-JS/crawlers/print get nothing). `qa.py` now
+runs `reveal_check.mjs`, which renders the page with its scripts stripped and **fails as
+`important` if a large share of text is invisible without JS** — so the robust pattern
+above is the definition of done, not a nicety.
+
+Ask: *does each below-the-fold section animate in on scroll, AND still show its content
+with JS disabled (reveal_check clean)?*
 
 ## 3. Vary section treatments — kill template filler
 
@@ -174,6 +190,34 @@ The hero's focal element depends on what's being sold, and "restrained" never me
   "generated ticks" block with nothing in it), and never ship a control that does nothing
   (a "Menu" button with no handler). It reads as unfinished on close inspection.
 
+## 8. Type engineering floor — the craft that separates *designed* from *default*
+
+A characterful pairing chosen well is only half the type work. The detail that reads as
+"a designer set this" is mechanical, and AI usually skips it. Ship all of it:
+
+- **Fluid type scale, not fixed px.** Size the display and headings with `clamp()` off one
+  modular ratio (≈1.25–1.333), so the hierarchy holds from 390px to 1440px without a wall of
+  breakpoints. `h1: clamp(2.5rem, 6vw + 1rem, 4.5rem)`; step body/labels off the same ratio.
+- **Tabular numerals on all data.** Any aligned/changing figure — metrics, prices, counts,
+  SHAs, timestamps, table cells — gets `font-variant-numeric: tabular-nums` (and `slashed-zero`
+  for code/IDs). Proportional digits in a stat row jitter and misalign; it's an instant tell.
+- **Govern line length and wrapping.** Body copy capped at a `max-width` of ~60–75ch
+  (`measure`); headings get `text-wrap: balance`, long paragraphs `text-wrap: pretty` to kill
+  orphans/rivers. Set `line-height` looser for body (~1.5–1.6), tighter for display (~1.05–1.15).
+- **Metric-matched fallback so the page doesn't reflow when the web font lands.** Declare a
+  fallback `@font-face` over a system face with `size-adjust` / `ascent-override` /
+  `descent-override` / `line-gap-override` tuned to the real font, and reference it in the
+  stack (`"Brand", "Brand Fallback", system-ui`). The page then renders on-metric offline and
+  during font swap — no CLS, no jarring jump. (This is also why the offline screenshot looks
+  finished, not bare.)
+- **Optical detail.** `letter-spacing` tightens slightly as display size grows (negative em on
+  large headings); set `font-feature-settings`/`font-variant` for the face's real features
+  (oldstyle figures for editorial, `ss01` etc. where the family offers them). Hang punctuation
+  / use `text-wrap: balance` rather than manual `<br>`.
+
+Ask: *fluid scale off one ratio · tabular-nums on every figure · measure capped + balanced
+headings · metric-matched fallback so nothing reflows?* If any is "no", it reads as default.
+
 ## Definition of done for a landing surface
 
 Before you call a hero/landing page finished, all of these are "yes":
@@ -181,6 +225,9 @@ Before you call a hero/landing page finished, all of these are "yes":
 - [ ] Hero has a focal point **and** a depth/overlap layer (not one flat pane)
 - [ ] One purposeful living detail in the hero (caret/sparkline/tick/pulse)
 - [ ] Below-the-fold sections reveal on scroll, gated by reduced-motion
+- [ ] **Content visible without JS** — reveals gated on `html.js`, `reveal_check.mjs` clean
+- [ ] Type floor: fluid `clamp()` scale · `tabular-nums` on data · `measure` cap + balanced
+      headings · metric-matched fallback `@font-face` (no reflow on font swap)
 - [ ] No template filler (no 3 clone cards, no number-grid standing in for product)
 - [ ] Product shown more than once, with **different** surfaces
 - [ ] Primary CTA is the loudest pixel at rest (glow/fill/arrow); secondary is quiet
