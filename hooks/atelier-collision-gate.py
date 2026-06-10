@@ -129,10 +129,11 @@ def main():
     tmp_globs = (glob.glob(os.path.join(TMP_ROOT, "*.html"))
                  + glob.glob(os.path.join(TMP_ROOT, "atelier*/**/*.html"), recursive=True))
     for p in tmp_globs:
-        base = os.path.basename(p)
-        # atelier's own scratch probes are not deliverables — never gate on them:
-        #   atelier-responsive* = sweep contact sheets;  atelier-nojs* = reveal_check no-JS probes.
-        if base.startswith("atelier-responsive") or base.startswith("atelier-nojs"):
+        # atelier's own scratch is not a deliverable — never gate on it. The sweep contact
+        # sheets live UNDER /tmp/atelier-responsive/<slug>/ and are named <slug>-sweep.html
+        # (so a basename check misses them — match the directory in the full path); the
+        # reveal_check no-JS probes (if any leak) are atelier-nojs*.
+        if "atelier-responsive" in p or os.path.basename(p).startswith("atelier-nojs"):
             continue
         try:
             if now - os.path.getmtime(p) <= RECENT_SECS:

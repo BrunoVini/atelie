@@ -167,7 +167,7 @@ function contactSheet(rows) {
     return `
     <figure>
       <figcaption>${r.width}px — ${tags.length ? tags.join(' · ') : 'ok'}</figcaption>
-      <img src="${path.basename(r.png)}" style="width:${Math.min(r.width, 480)}px">
+      <img src="${path.basename(r.png)}" style="width:${Math.min(r.width, 480)}px;max-width:100%;height:auto">
       ${r.offenders?.length ? '<ul class="of">' + r.offenders.map(o => `<li>overflow: ${o.sel} — ${o.w}px</li>`).join('') + '</ul>' : ''}
       ${r.overlaps?.length ? '<ul class="ov">' + r.overlaps.map(o => `<li>overlap ${o.pct}%: ${o.a} ↔ ${o.b}</li>`).join('') + '</ul>' : ''}
       ${r.decoOverlaps?.length ? '<ul class="dv">' + r.decoOverlaps.map(o => `<li>${o.opaque ? 'collision' : 'verify'}: ${o.deco} on text ${o.text} (${o.pct}%)</li>`).join('') + '</ul>' : ''}
@@ -176,7 +176,7 @@ function contactSheet(rows) {
   return `<!DOCTYPE html><meta charset="utf-8"><title>atelier — responsive sweep</title>
 <style>body{font-family:ui-serif,Georgia,serif;margin:0 auto;max-width:1100px;padding:32px}
 figure{margin:0 0 28px;border:1px solid #0002;padding:12px}figcaption{font-weight:600;margin-bottom:8px}
-img{display:block;border:1px solid #0001}ul{font:13px/1.5 monospace}ul.of{color:#b00}ul.ov{color:#a60}ul.dv{color:#789}</style>
+img{display:block;border:1px solid #0001;max-width:100%;height:auto}ul{font:13px/1.5 monospace}ul.of{color:#b00}ul.ov{color:#a60}ul.dv{color:#789}</style>
 <h1>Responsive sweep — ${slug}</h1>${cells}`;
 }
 
