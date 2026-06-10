@@ -85,9 +85,13 @@ Ask: *is any block pure filler (identical clones, a number grid with nothing to 
 A conversion page has ONE action that should win the eye before any interaction. A flat
 CTA that only lifts on hover under-sells itself.
 
-- Give the resting primary CTA real presence: a subtle glow/elevation, full accent fill,
-  and a directional affordance (an `→`). The secondary CTA stays quiet (ghost/outline).
+- Give the resting primary CTA real presence: full accent fill, weight, and a directional
+  affordance (an `→`). The secondary CTA stays quiet (ghost/outline).
 - It should still read as the focal action in a grayscale screenshot.
+- **Presence comes from weight/fill/contrast, not a neon glow.** A literal box-shadow "glow"
+  plus pulsing status dots is the dark-SaaS genre default a discerning reviewer marks as a
+  tell — earn presence through size, fill, and surrounding restraint instead, unless the
+  page's concept genuinely calls for emission (e.g. an actual instrument readout).
 
 Ask: *if I squint, is the primary CTA obviously the brightest/heaviest element?*
 
@@ -246,6 +250,11 @@ Use proof you can actually stand behind:
 - Numbers must be **defensible or explicitly illustrative** — don't assert invented percentages
   as fact. And **wire the primary CTA and nav**; reserve `aria-disabled` for a few clearly-demo
   affordances, not the whole page (a landing whose actions don't work reads as unfinished).
+- **No scale-theater.** A throughput/volume flex ("1.4M events/min", "trusted with billions of
+  spans", "powering 10,000 teams") implies traction a brand-new product hasn't earned and
+  *contradicts* an honest "we're early" voice — a senior reader reads it as fiction. If you cite
+  a figure, make it a **product fact you can stand behind** (a latency target, a retention window,
+  "self-host", "MIT", a real benchmark), not implied customer scale.
 
 Ask: *would this proof survive someone asking "is that real?"* If not, cut it or make it honest.
 
