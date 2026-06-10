@@ -513,3 +513,26 @@ infer what's happening. Gates:
 - **The processing beat must read as processing** (a bright ring/core pulse), not a faint halo
   bump — on a still frame it should be obvious the hub is doing work. And size destination icons
   enough that each glyph's meaning reads.
+
+### §19c — the narration caption lane is protected; one dominant register per beat
+Lessons from a narrated explainer where the teaching was strong but legibility + restraint lost:
+
+- **Reserve a caption band and keep it CLEAR of art.** The synced narration caption is the one
+  thing a viewer is reading right now; never let geometry, ring strokes, icons, or any decoration
+  cross it (this is §18's text-over-art rule applied to the caption lane). Park the diagram so its
+  growing circles/paths/icons never enter the caption band — if a stroke or a satellite glyph runs
+  through the words, the caption is damaged even if its own contrast is fine. Check the caption
+  band is clean on the *held* frame of every beat, not just at rest.
+- **One dominant text register per beat.** A beat that simultaneously shows a kicker + a rule
+  headline + the caption + a legend is four things competing — it reads as clutter and the eye
+  doesn't know what to read. Keep the caption the dominant register; demote or drop the others
+  (a kicker is fine; a second full headline saying the same thing as the caption is not). Restraint
+  in an explainer is *register count*, not just color count.
+- **Let the finale breathe.** Don't stack every layer you've built (all rings + badge + display
+  title + caption) on the closing frames — resolve/fade the working geometry so the payoff lands
+  on a calm frame, not the busiest one. The climax is a moment of clarity, not maximum density.
+- **Hold time vs. reading speed.** Size each caption's on-screen window (start→end) to its length
+  at a comfortable ~12 chars/sec, not the ~15 cps brisk limit — a line the viewer can't finish
+  reading before it leaves is an unread line.
+- [ ] Narrated: is the caption band clear of art on every held frame, is there ONE dominant text
+  register per beat, does the finale breathe, and does every caption hold long enough to read?
