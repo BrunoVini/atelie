@@ -86,7 +86,14 @@ of this initial pre-release; nothing has shipped under a version tag yet.
 - `data-viz-craft` — data integrity and encoding discipline (e.g. a categorical hue
   must not also signal delta direction; a date range must actually re-slice the data).
 - `landing-craft` — genre-matched focal moments, characterful type, and honestly
-  finished interactions.
+  finished interactions. A production type-engineering floor (fluid `clamp()` scale,
+  `tabular-nums`/`slashed-zero` on data, balanced/pretty wrapping, and a metric-matched
+  fallback `@font-face` so the body stays characterful even offline); an **honest-proof**
+  rule (never fabricate logo walls, named testimonials, or scale-theater throughput stats
+  for a product with no real customers — use verifiable facts); "subvert the genre default"
+  (commit to an owned aesthetic over the first-reach cliché); a headline-length / no-dead-
+  space hierarchy pass; and data-viz that renders its true values without JS (no chart left
+  blank by a reveal-class that never fires).
 - Living style guide page (swatches, type scale, spacing, component inventory).
 - Realistic content with empty / loading / error states so mockups aren't lorem-ipsum.
 - Motion / interaction specs.
@@ -105,7 +112,17 @@ of this initial pre-release; nothing has shipped under a version tag yet.
   checks and fixed until clean.
 - Slop detector across three layers (visual, copy, structural) — generic fonts, purple
   gradient, gratuitous glassmorphism, chunky left-border cards — verifying non-slop
-  rather than just prompting for it.
+  rather than just prompting for it. Also catches **fabricated social proof** (a
+  customer/logo wall + testimonials for a product with no disclosed customers),
+  **too-many-dead-links** (a landing that's mostly `aria-disabled`), and **dead in-page
+  anchors** (`href="#section"` with no matching `id`); anti-slop now also binds in the
+  blocking `qa.py --hook` self-QA loop, not just in full-mode review.
+- **Progressive-enhancement gate** (`reveal_check.mjs`): a page must show its content
+  without its own JavaScript — it renders the page with scripts stripped and fails if a
+  large share of content is gated behind a JS-only reveal (the pattern that screenshots
+  blank for crawlers, print, and static review). **Capture honesty**: screenshots and the
+  paint-weighted color scan now scroll-drive reveals first, so a review sees the whole page
+  a scrolling user sees, not a half-blank fold.
 - WCAG contrast audit for every text/surface pairing in the locked palette, with
   nearest-passing shade suggestions and on-pair contrast scoring.
 - Overlap / collision hunting across screen sizes, on by default in any scan or review:

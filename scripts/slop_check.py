@@ -437,7 +437,11 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
                          "detail": "rounded card + left colored border — a dated cliché combo"})
 
     # 6. Too many distinct font families (generic stack fallbacks don't count).
-    distinct = {f.lower() for f in used if f and f.lower() not in _FONT_FALLBACKS}
+    # Metric-matched fallback faces (declared as "<Brand> Fallback" @font-face over a system
+    # font, with size-adjust/ascent-override) are a RECOMMENDED craft practice (type floor),
+    # not extra typefaces — don't count them toward the too-many-fonts limit.
+    distinct = {f.lower() for f in used
+                if f and f.lower() not in _FONT_FALLBACKS and "fallback" not in f.lower()}
     if len(distinct) > 4:
         findings.append({"severity": "polish", "kind": "too-many-fonts",
                          "detail": f"{len(distinct)} font families — tighten to a display + body (+mono)"})
