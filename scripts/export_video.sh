@@ -61,11 +61,23 @@ const [input, outDir, frames, fps] = process.argv.slice(-4);
   await page.goto(url, { waitUntil: 'networkidle' });
   // Wait for web fonts so frames aren't a fallback-font "raw HTML" render.
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
+  // Frame-EXACT capture when the page opts into the handshake: __ready (assets/animation
+  // initialized) + __seek(ms) (drive the animation by a virtual clock) make capture
+  // deterministic — no wall-clock drift, no leading blank frame, no mid-cycle loop. A page
+  // that doesn't expose __seek falls back to the real-time screenshot loop.
+  const hasSeek = await page.evaluate(() => typeof window.__seek === 'function').catch(() => false);
+  const hasReady = await page.evaluate(() => typeof window.__ready !== 'undefined').catch(() => false);
+  if (hasReady) await page.evaluate(() => Promise.resolve(window.__ready)).catch(() => {});
   const interval = 1000 / Number(fps);
   for (let i = 0; i < Number(frames); i++) {
     const f = String(i).padStart(5, '0');
+    if (hasSeek) {
+      await page.evaluate((t) => window.__seek(t), i * interval);
+      // let the seek paint before grabbing (two rAFs = one committed frame)
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {});
+    }
     await page.screenshot({ path: path.join(outDir, `frame-${f}.png`) });
-    await new Promise(r => setTimeout(r, interval));
+    if (!hasSeek) await new Promise(r => setTimeout(r, interval));
   }
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });

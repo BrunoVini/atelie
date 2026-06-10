@@ -24,9 +24,22 @@ of this initial pre-release; nothing has shipped under a version tag yet.
 - Color provenance: each measured color now carries the files it lives in and the
   dominant file's share, so the contract can state evidence ("primary `#2563eb` — 412
   uses across 9 files") instead of an opaque blob count.
+- Algorithmic token synthesis (`synthesize_tokens.py`): given one or more brand seed
+  colors, derives a full WCAG-correct token set for greenfield work — on-colors picked by
+  luminance so text always reads (AA-large on fills, AA-normal for body), muted/card by
+  blend, dark mode detected from the background. The cold-start counterpart to measuring.
+- Curated fonts catalog (`references/knowledge/fonts-catalog.csv`, searchable via
+  `search_kb --domain fonts-catalog`): the data a model can't reliably recall — which fonts
+  cover CJK / Arabic / Cyrillic / Vietnamese and which variable axes they expose. (Trimmed
+  on purpose — not row-count parity; icons/react-perf DBs were intentionally not imported.)
 - DESIGN.md "Agent Prompt Guide": a flat copy-paste cheat-sheet section in the template
   (literal palette/type values + ready-to-paste section prompts) the generator fills, so
   any coding agent — not just atelier — can build on-contract without reading the whole file.
+- Frame-exact video capture: `export_video.sh` now drives deterministic capture via the
+  `__ready`/`__seek(ms)` handshake when a page exposes it (no wall-clock drift, no leading
+  blank frame, no mid-cycle loop), falling back to the real-time screenshot loop otherwise.
+  (Vendored SFX/BGM and a TTS narration producer remain out of scope — atelier is a design
+  studio, not a video producer; offline font-binary bundling is deferred.)
 - Render-grounded measurement (`scan_rendered.mjs`): measures the colors users actually
   *see*, weighted by on-screen painted area, and reconciles against the static scan —
   surfacing "declared but not painted" (dead palette) and "painted but not declared"

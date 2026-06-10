@@ -210,7 +210,12 @@ the main reason cold-start output is generic; naming the read up front breaks it
 2. **Offer 2–3 distinct directions**, not one — let the user pick (see `variants.md`).
    Each is a committed tone + palette + type + motion, named (not "modern/clean").
 3. **Capture a tiny inline contract** from the pick (tone + palette roles + the one
-   display/body/mono + motion) so generation is constrained even without a repo.
+   display/body/mono + motion) so generation is constrained even without a repo. With only
+   a brand color or two, synthesize a full WCAG-correct token set (on-colors, muted, card,
+   border, ring) instead of hand-picking:
+   ```bash
+   python3 scripts/synthesize_tokens.py '{"primary":"#2563eb","background":"#ffffff"}'
+   ```
    Then **guard against your own sameness** — check the pick differs from recent
    cold-start work, and record it once committed:
    ```bash

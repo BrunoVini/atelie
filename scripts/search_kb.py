@@ -27,6 +27,7 @@ _DOMAIN_FILE = {
     "charts": "charts.csv",
     "ux-guidelines": "ux-guidelines.csv",
     "font-substitutes": "font-substitutes.csv",
+    "fonts-catalog": "fonts-catalog.csv",
     "styles": "styles.csv",
     "stack-guidance": "stack-guidance.csv",
     "reasoning": "reasoning.csv",
