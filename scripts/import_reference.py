@@ -8,6 +8,7 @@ Usage:
     python3 import_reference.py --image shot.png         # quantize dominant colors
     python3 import_reference.py --url https://example.com # crawl HTML + linked CSS
     python3 import_reference.py --url https://example.com --computed  # + browser pass
+    python3 import_reference.py --stitch path/DESIGN.md  # import a Google Stitch DESIGN.md
 
 Image mode decodes PNG in pure Python (8-bit truecolor / truecolor-alpha) and
 clusters the dominant colors perceptually (reusing scan_repo's ΔE). URL mode is
@@ -178,7 +179,15 @@ def crawl_url(url, max_css=12):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if "--image" in args:
+    if "--stitch" in args:
+        from contract import from_stitch
+        path = args[args.index("--stitch") + 1]
+        contract = from_stitch(path)               # local file, no network
+        print(json.dumps(contract, indent=2))
+        print("\nNext: review roles + feed the resolved contract into generate-design-md "
+              "(typography/components surface verbatim; refs are left for the consumer).",
+              file=sys.stderr)
+    elif "--image" in args:
         path = args[args.index("--image") + 1]
         colors = colors_from_image(path)
         print(json.dumps({"source": path, "dominant_colors": colors}, indent=2))
@@ -195,5 +204,5 @@ if __name__ == "__main__":
               "Add --computed for a headless-browser computed-style pass (needs playwright).",
               file=sys.stderr)
     else:
-        print("usage: import_reference.py --image <png> | --url <url> [--computed]")
+        print("usage: import_reference.py --image <png> | --url <url> [--computed] | --stitch <DESIGN.md>")
         sys.exit(2)

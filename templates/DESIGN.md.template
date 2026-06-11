@@ -46,6 +46,25 @@
      "product" (design SERVES the product — app UI/dashboard/settings/tools). It
      modulates QA severity for this surface (see references/registers/). When ambiguous,
      "product" is the safer default; brand is opt-in. Delete the key to leave it unset. -->
+<!-- OPTIONAL (additive) — a machine-readable type ramp + component minimums. Both keys
+     are surfaced verbatim by contract.py; omit them entirely for a lean contract. To use
+     them, paste the keys INTO the JSON block above (valid JSON, not this comment):
+
+  "typography": {
+    "display-xl": { "fontFamily": "Sora, serif", "fontSize": "64px", "fontWeight": 400,
+                    "lineHeight": 1.05, "letterSpacing": "-1.5px", "features": ["ss01", "tnum"] },
+    "body-md":    { "fontFamily": "Inter, sans-serif", "fontSize": "16px", "fontWeight": 400,
+                    "lineHeight": 1.55, "letterSpacing": "0" }
+  },
+  "components": {
+    "button-primary": { "backgroundColor": "{colors.primary}", "textColor": "{colors.on-primary}",
+                        "typography": "{typography.body-md}", "rounded": "{rounded.md}",
+                        "padding": "12px 20px", "height": "40px" }
+  }
+
+     `features` is a LIST of OpenType tags (e.g. ["ss01","tnum"]); accepts Stitch camelCase
+     (fontFamily/fontSize/...) or atelier snake_case (font/size/weight/line_height/tracking).
+     Component `{ref}` strings are NOT resolved by the contract — the consumer resolves them. -->
 
 
 ## 1. Identity & tone

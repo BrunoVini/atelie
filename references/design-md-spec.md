@@ -38,6 +38,65 @@ dark tokens are documentation, not contract. Omit the `dark` key for a light-onl
 }
 ```
 
+**Typography & components (optional, machine-readable).** The block may also carry a
+`"typography"` map and a `"components"` map — both additive and surfaced verbatim:
+
+- `"typography"`: `{role: {...}}`. Per role: `fontFamily`/`font`, `fontSize`/`size`,
+  `fontWeight`/`weight`, `lineHeight`/`line_height`, `letterSpacing`/`tracking`, plus
+  atelier's enrichment `features` — a LIST of OpenType feature tags (e.g.
+  `["ss01","tnum"]`). Both Stitch camelCase and atelier snake_case keys are accepted;
+  `contract.py` normalizes each role to `{family, size, weight, line_height, tracking,
+  features}` (only present keys are emitted; `features` is always a list, possibly empty).
+  Surfaced as `contract["typography"]` only when a valid map is present.
+- `"components"`: `{component: {...}}` — per-component minimum specs (e.g.
+  `backgroundColor`, `textColor`, `typography`, `rounded`, `padding`, `height`,
+  `minHeight`, `gap`). Surfaced VERBATIM as `contract["components"]`; `{colors.x}` /
+  `{typography.x}` / `{rounded.x}` references are kept as strings — `contract.py` does
+  NOT resolve them (that's the consumer's job). Surfaced only when present.
+
+```json atelier-contract
+{
+  "colors": { "primary": "#cc785c", "on-primary": "#ffffff", "ink": "#141413" },
+  "fonts": ["Copernicus", "StyreneB"],
+  "typography": {
+    "display-xl": { "fontFamily": "Copernicus, serif", "fontSize": "64px",
+                    "fontWeight": 400, "lineHeight": 1.05, "letterSpacing": "-1.5px",
+                    "features": ["ss01", "tnum"] }
+  },
+  "components": {
+    "button-primary": { "backgroundColor": "{colors.primary}", "textColor": "{colors.on-primary}",
+                        "typography": "{typography.button}", "rounded": "{rounded.md}",
+                        "padding": "12px 20px", "height": "40px" }
+  }
+}
+```
+
+Both keys are absent by default; a block without them yields a contract with no
+`typography`/`components` keys (fully backward-compatible).
+
+## Importing a Google Stitch DESIGN.md
+
+Google Stitch emits a `DESIGN.md` whose contract lives in a YAML front-matter block
+(`---` delimited) with `colors`, `typography`, `rounded`, `spacing`, and `components`
+maps. atelier reads that format directly:
+
+- **CLI:** `python3 scripts/import_reference.py --stitch path/to/DESIGN.md` prints the
+  resolved atelier contract as JSON (a local file; no network).
+- **Automatic:** `resolve_contract` detects a genuine Stitch front matter — a leading
+  `---` block carrying BOTH a top-level `colors:` and a `typography:` map — and routes
+  it through the importer, but ONLY after the fenced ```atelier-contract``` block check
+  fails. atelier's own DESIGN.md files use the fenced block (parsed first) and have no
+  front matter, so they're unaffected. A Stitch-sourced contract is stamped
+  `source_format: "stitch"` for traceability.
+
+The importer maps Stitch into the contract model: `colors` (hex map; non-hex values like
+`oklch(...)` recorded in `machine_block_dropped`), `fonts` (distinct first-family per
+typography role, order-preserving), `spacing`, `radius` (from `rounded`), `typography`
+(normalized as above; Stitch's `fontFeature: ss01` collapses into `features: ["ss01"]`),
+and `components` (verbatim). `register`/`depth` stay `None` unless inferable. There is no
+PyYAML on the target machine, so the front matter is parsed by a small stdlib subset
+parser (2-space-indented nested maps, `key: value` scalars, `#` comments tolerated).
+
 ## Sections (use the template in `templates/DESIGN.md.template`)
 
 1. **Identity & tone** — inferred product type, audience, and the ONE committed

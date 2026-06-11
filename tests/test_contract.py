@@ -210,6 +210,74 @@ def test_register_resolves_end_to_end_from_design_md(tmp_path):
     assert c["register"] == "brand"
 
 
+# --- typography + components in the machine block (Phase E) ------------------
+# Two NEW optional keys ride in the fenced atelier-contract block, additive: a
+# `typography` {role:{...}} map (with atelier's OpenType `features` enrichment) and
+# a `components` {component:{...}} map. A block WITHOUT them yields a contract with
+# NO such keys (additive proof); existing fields stay unchanged.
+
+def test_block_surfaces_typography_with_features():
+    from contract import _contract_from_block
+    c = _contract_from_block({
+        "colors": {"ink": "#111111", "paper": "#ffffff"}, "fonts": ["Sora"],
+        "typography": {
+            "display-xl": {"fontFamily": "Copernicus, serif", "fontSize": "64px",
+                           "fontWeight": 400, "lineHeight": 1.05, "letterSpacing": "-1.5px",
+                           "features": ["ss01", "tnum"]},
+        }}, "x")
+    t = c["typography"]["display-xl"]
+    assert t["family"] == "Copernicus, serif"      # full stack kept in typography
+    assert t["size"] == "64px" and t["weight"] == "400"
+    assert t["line_height"] == "1.05" and t["tracking"] == "-1.5px"
+    assert t["features"] == ["ss01", "tnum"]        # OpenType features surfaced verbatim
+
+
+def test_block_typography_accepts_snake_case_aliases():
+    from contract import _contract_from_block
+    c = _contract_from_block({
+        "colors": {"ink": "#111111"},
+        "typography": {"body": {"font": "Inter", "size": "16px", "weight": "400",
+                                "line_height": "1.5", "tracking": "0"}}}, "x")
+    t = c["typography"]["body"]
+    assert t["family"] == "Inter" and t["line_height"] == "1.5" and t["tracking"] == "0"
+    assert t["features"] == []                      # features always a list
+
+
+def test_block_surfaces_components_verbatim_without_resolving_refs():
+    from contract import _contract_from_block
+    c = _contract_from_block({
+        "colors": {"primary": "#cc785c", "on-primary": "#ffffff"},
+        "components": {"button-primary": {
+            "backgroundColor": "{colors.primary}", "textColor": "{colors.on-primary}",
+            "rounded": "{rounded.md}", "padding": "12px 20px", "height": "40px"}}}, "x")
+    b = c["components"]["button-primary"]
+    assert b["backgroundColor"] == "{colors.primary}"    # ref NOT resolved
+    assert b["padding"] == "12px 20px" and b["height"] == "40px"
+
+
+def test_block_without_typography_or_components_has_no_such_keys():
+    # additive proof: a plain block yields a contract with NO typography/components keys
+    from contract import _contract_from_block
+    c = _contract_from_block(
+        {"colors": {"ink": "#111111", "paper": "#ffffff"}, "fonts": ["Sora"], "spacing": ["4px"]}, "x")
+    assert "typography" not in c and "components" not in c
+    assert c["colors"] == {"ink": "#111111", "paper": "#ffffff"}   # existing fields unchanged
+    assert c["fonts"] == ["Sora"] and c["spacing"] == ["4px"]
+
+
+def test_block_typography_and_components_resolve_end_to_end(tmp_path):
+    d = tmp_path / "DESIGN.md"
+    d.write_text(
+        "```json atelier-contract\n"
+        '{"colors":{"ink":"#111111","paper":"#ffffff"},"fonts":["Sora"],'
+        '"typography":{"display":{"fontFamily":"Sora","fontSize":"48px","features":["ss01"]}},'
+        '"components":{"btn":{"backgroundColor":"{colors.ink}","padding":"8px 16px"}}}\n'
+        "```\n")
+    c = resolve_contract(str(d))
+    assert c["typography"]["display"]["features"] == ["ss01"]
+    assert c["components"]["btn"]["backgroundColor"] == "{colors.ink}"
+
+
 def test_template_has_agent_prompt_guide():
     import os
     tmpl = os.path.join(os.path.dirname(__file__), "..", "templates", "DESIGN.md.template")
