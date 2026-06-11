@@ -117,6 +117,23 @@ and the code's threshold differ, **the code's number is authoritative** and note
   image tiles when the box outgrows it. (Defensive CSS; gradients are exempt.)
   → enforced by: `slop_ported.py` / `bg-no-no-repeat`
 
+## Depth & Elevation
+
+- **One elevation strategy per surface.** A surface earns depth with ONE of {shadow,
+  border/hairline, tint/fill}, not two or three stacked (the muddy "ghost card"). And
+  **one system per page** — don't mix shadowed, bordered, and tinted cards on one
+  screen. (Code flags a single surface stacking ≥2 load-bearing strategies as
+  `mixed-elevation`, scoped to the pairs `gpt-ghost-card` does NOT own; and a page of
+  ≥3 card-like surfaces with ≥2 strategies and no dominant one as
+  `no-single-elevation-system`. See `capabilities/layering.md`.)
+  → enforced by: `slop_ported.py` / `mixed-elevation`, `no-single-elevation-system`; `slop_check.py` / `gpt-ghost-card`
+- **Elevation ladder: 3-5 named levels** (base → raised → overlay → modal), each one
+  consistent treatment reused everywhere — not a fresh shadow per component.
+  *(judgment / not auto-checked)*
+- **Hairlines are the foreground color at 6-12% alpha**, opacity rising slightly with
+  elevation — never a hardcoded gray that breaks on dark/tinted surfaces.
+  *(judgment / not auto-checked)*
+
 ## Motion
 
 - **Ease out with exponential curves** (ease-out-quart / quint / expo). **No bounce,

@@ -145,6 +145,133 @@ def shadow_blur_px(value):
     return max((_layer_blur_px(layer) for layer in shadow_layers(value)), default=0)
 
 
+# --- elevation-strategy classification (layering doctrine) ------------------------
+# A surface earns depth with ONE strategy: a shadow, OR a border/hairline, OR a tint
+# (a fill step off the page base). Stacking two or three reads muddy. These helpers
+# classify which strategies a single card-like rule uses as LOAD-BEARING elevation,
+# and the page-level checks below enforce "one elevation strategy per surface / one
+# system per page". See references/capabilities/layering.md.
+#
+# Division of labor with `gpt-ghost-card` (in slop_check._profile_tells): ghost-card
+# owns the *border + wide shadow* pair (1px hairline + ≥16px blur). `mixed-elevation`
+# scopes itself to the cases ghost-card does NOT cover — shadow+tint, border+tint, a
+# ≥2px border + shadow — so the two don't double-fire on the PLAIN 1px-border+shadow
+# card. (A 3-strategy ghost card — tint + 1px border + shadow — legitimately fires BOTH:
+# ghost-card for the hairline+shadow and mixed-elevation for the added tint.)
+_CARD_SEL_RX = re.compile(r"\b(?:card|panel|tile|surface|box)\b", re.I)
+# A border counts as a LOAD-BEARING elevation strategy only when it's actually visible:
+# width ≥1px AND a non-transparent color. A 6-12%-alpha hairline (the standard way a
+# tinted/dark surface gets its edge — see the doctrine) is part of the tint strategy,
+# NOT a second strategy, so it must NOT count here. Alpha < 0.2 → not load-bearing.
+_BORDER_LOADBEARING_ALPHA = 0.2
+
+
+def _rgba_alpha(s):
+    """Alpha channel of an rgb()/rgba()/hsl()/hsla() color (1.0 if opaque / not
+    parseable). Handles both the legacy comma grammar `rgba(r,g,b,A)` and the modern
+    space-slash grammar `rgb(r g b / A)`; a `%` alpha is normalized (`/100`)."""
+    # space-slash grammar: rgb(... / A) / hsl(... / A%)  — alpha after the slash
+    m = re.search(r"(?:rgba?|hsla?)\([^)]*/\s*([\d.]+)(%?)\s*\)", s, re.I)
+    if not m:
+        # legacy comma grammar: rgba(r, g, b, A) / hsla(h, s%, l%, A) — last comma slot
+        m = re.search(r"(?:rgba?|hsla?)\([^)]*,\s*([\d.]+)(%?)\s*\)", s, re.I)
+    if m:
+        try:
+            a = float(m.group(1))
+            return a / 100.0 if m.group(2) else a
+        except ValueError:
+            return 1.0
+    return 1.0
+
+
+def _loadbearing_border_width(body):
+    """The width (px) of the first VISIBLE border (width ≥1px, non-transparent color) —
+    a deliberate edge, not a faint hairline that belongs to a tint surface. Returns None
+    when no load-bearing border is declared."""
+    # shorthand: border: <width> <style> <color>  (or border-<side>: ...)
+    for m in re.finditer(
+            r"border(?:-(?:top|right|bottom|left))?\s*:\s*([^;}{]+)", body, re.I):
+        val = m.group(1).strip().lower()
+        if "none" in val or val in ("0", "0px"):
+            continue
+        wm = re.search(r"(\d+(?:\.\d+)?)px", val)
+        width = float(wm.group(1)) if wm else 1.0     # `border:solid red` ⇒ medium ≈3px
+        if width < 1:
+            continue
+        if re.search(r"\btransparent\b", val):
+            continue
+        if _rgba_alpha(val) < _BORDER_LOADBEARING_ALPHA:
+            continue                                  # faint hairline → tint's edge, not a strategy
+        return width
+    # longhand border-width with a separate (opaque) border-color is rare in card CSS;
+    # we stay conservative and only treat the shorthand form as load-bearing.
+    return None
+
+
+def _has_loadbearing_border(body):
+    """True when this rule declares a VISIBLE border (a deliberate edge)."""
+    return _loadbearing_border_width(body) is not None
+
+
+def _surface_strategies(body, page_bg):
+    """The set of LOAD-BEARING elevation strategies a single card-like rule uses,
+    drawn from {'shadow', 'border', 'tint'}, plus the load-bearing border width in px
+    (None if no border). Conservative by design (false positives are the enemy): a faint
+    hairline isn't a border, an inset shadow isn't elevation, and a fill equal to (or the
+    un-tinted paper of) the page base isn't a tint.
+
+    Returns (strategies:set, border_width:float|None)."""
+    strategies = set()
+    # shadow: a non-inset box-shadow with blur > 0
+    sm = re.search(r"box-shadow\s*:\s*([^;}{]+)", body, re.I)
+    if sm:
+        val = sm.group(1)
+        if "inset" not in val.lower() and "none" not in val.lower() \
+                and shadow_blur_px(val) > 0:
+            strategies.add("shadow")
+    # border: a visible, opaque-enough border ≥1px
+    border_width = _loadbearing_border_width(body)
+    if border_width is not None:
+        strategies.add("border")
+    # tint: a background-color that differs from the page base (a fill step). var()/
+    # gradient/space-separated/oklch()/hsl()/unparseable backgrounds are skipped — when
+    # _parse_rgb can't compare them we treat them as non-tint (a safe under-count: we'd
+    # rather miss a tint than misfire on one we couldn't measure).
+    bm = re.search(r"background(?:-color)?\s*:\s*([^;}{]+)", body, re.I)
+    if bm:
+        val = bm.group(1).strip().lower()
+        if "gradient" not in val and "url(" not in val and "var(" not in val \
+                and "transparent" not in val and "none" not in val:
+            rgb = _parse_rgb(val)
+            if rgb is not None and (page_bg is None or
+                                    sum(abs(a - b) for a, b in zip(rgb, page_bg)) > 8):
+                # A near-WHITE card on a LIGHT page (or a near-BLACK card on a DARK page)
+                # is the un-tinted PAPER surface — the default canvas, not a deliberate
+                # tint step off the ground. The summed-RGB delta would otherwise treat a
+                # plain white card on an off-white ground (the canonical SaaS layout) as a
+                # tint, misfiring mixed-elevation. So exclude the paper case here rather
+                # than raising the delta threshold (which overlaps genuine tints).
+                page_light = page_bg is not None and min(page_bg) >= 200
+                page_dark = page_bg is not None and max(page_bg) <= 60
+                is_paper = (page_light and min(rgb) >= 250) or \
+                           (page_dark and max(rgb) <= 5)
+                if not is_paper:
+                    strategies.add("tint")
+    return strategies, border_width
+
+
+def _page_base_rgb(blocks):
+    """The page base background — from a body/html/:root rule, else None."""
+    for sel, body in blocks:
+        if re.search(r"(?:^|[\s,>])(?:body|html|:root)(?:$|[\s,{:.>])", sel, re.I):
+            bm = re.search(r"background(?:-color)?\s*:\s*([^;}{]+)", body, re.I)
+            if bm:
+                rgb = _parse_rgb(bm.group(1).strip())
+                if rgb is not None:
+                    return rgb
+    return None
+
+
 class _CardNesting(HTMLParser):
     """Count card-class elements nested inside other card-class elements.
     'card-grid' / 'cards' are containers OF cards, not cards — only the exact
@@ -674,5 +801,57 @@ def ported_tells(html, allowed=None):
             f"a url() background ({sel.strip()[:40]}) with no background-repeat — it "
             "tiles when the box outgrows the image; add `background-repeat: no-repeat`")
         break
+
+    # 25-26. Layering / elevation doctrine (references/capabilities/layering.md).
+    #   A surface earns depth with ONE strategy — shadow OR border OR tint — not two
+    #   or three stacked (reads muddy). Two checks:
+    #     mixed-elevation        — a SINGLE surface stacking ≥2 load-bearing strategies,
+    #                              SCOPED to the pairs gpt-ghost-card does NOT own (that
+    #                              rule keeps the plain 1px-border + wide-shadow case).
+    #     no-single-elevation-system — the page has ≥3 card-like surfaces that don't
+    #                              share ONE dominant strategy (a split system).
+    page_bg = _page_base_rgb(blocks)
+    surface_strategies = []                           # per card-like rule
+    mixed_fired = False
+    for sel, body in blocks:
+        if not _CARD_SEL_RX.search(sel):
+            continue
+        strat, border_w = _surface_strategies(body, page_bg)
+        if not strat:
+            continue                                  # no elevation at all → not a surface here
+        surface_strategies.append(strat)
+        # Per-surface: ≥2 stacked strategies, but DEFER the {border, shadow} pair to
+        # ghost-card ONLY when the border is ~1px — that 1px-hairline + wide-shadow case
+        # is exactly what ghost-card owns. A border ≥2px + shadow is a genuine two-
+        # strategy muddy card that ghost-card never matches, so mixed-elevation must
+        # still fire on it. Everything else — shadow+tint, border+tint, all three — is
+        # always mixed-elevation.
+        defers_to_ghost = (strat == {"border", "shadow"}
+                           and border_w is not None and border_w <= 1)
+        if not mixed_fired and len(strat) >= 2 and not defers_to_ghost:
+            mixed_fired = True
+            add("polish", "mixed-elevation",
+                f"one surface ({sel.strip()[:40]}) stacks {'+'.join(sorted(strat))} as "
+                "elevation — pick ONE strategy (shadow, border, OR a tint step), not "
+                "several; stacked depth reads muddy")
+    # Per-page: only meaningful with ≥3 elevated surfaces. A page is a "split system"
+    # when ≥2 distinct strategies are each used by ≥1 surface AND no single strategy is
+    # the clear majority (> half of the surfaces). One shadowed hero + flat content
+    # passes (flat content sets no strategy, so it isn't counted as a surface). Multi-
+    # strategy surfaces count toward EACH strategy they use.
+    if len(surface_strategies) >= 3:
+        usage = Counter()
+        for strat in surface_strategies:
+            for s in strat:
+                usage[s] += 1
+        distinct_used = [s for s, n in usage.items() if n >= 1]
+        n = len(surface_strategies)
+        dominant_n = max(usage.values()) if usage else 0
+        if len(distinct_used) >= 2 and dominant_n <= n / 2:
+            add("polish", "no-single-elevation-system",
+                f"{n} card-like surfaces use {len(distinct_used)} different elevation "
+                f"strategies ({', '.join(sorted(distinct_used))}) with no dominant one — "
+                "establish ONE elevation system for the page (all shadowed, all "
+                "bordered, OR all tinted), not a mix")
 
     return findings

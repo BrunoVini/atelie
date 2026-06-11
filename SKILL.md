@@ -107,6 +107,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | A hi-fi prototype / app mockup / device frame | `references/capabilities/prototypes.md` | `assets/frames/*.jsx` |
 | A landing / marketing / hero page (make it read *designed*) | `references/capabilities/landing-craft.md` | `slop_check.py` |
 | A dashboard / data viz / chart / KPI / analytics UI | `references/capabilities/data-viz-craft.md` | `search_kb.py` (charts) |
+| Depth / elevation / layering — cards, panels, overlays, shadows, "make it sit above", when surfaces stack (PT: profundidade, elevação, camadas, sombras) | `references/capabilities/layering.md` | `slop_ported.py` (mixed-elevation, no-single-elevation-system) |
 | A settings / account / form / sign-up / onboarding / wizard / admin / app utility surface | `references/capabilities/forms-craft.md` | `slop_check.py` |
 | A live preview / demo / "show me" / pick between options | `references/capabilities/preview.md` | `scripts/preview/start.sh` |
 | Iterate live on an element (pick → contract-bound variants → accept into source) | `references/capabilities/preview.md` | `scripts/edit_apply.py` |
