@@ -19,6 +19,16 @@ An analyst reads these numbers literally. Any silent gap reads as "there is no v
   shown current value. Wrong-direction or wrong-magnitude deltas destroy trust instantly.
 - **Chart geometry matches the data.** Bar widths / line endpoints / arc angles must
   reflect the real values, and the text/aria summary must match what's drawn.
+- **One scale maps value→position — gridlines, axis labels, AND data marks all use it.**
+  The single most common chart lie that passes a values-are-correct check: the bars are
+  numerically right but the reference grid is drawn on a *different* scale, so a value reads
+  wrong *against the grid* (e.g. a "20%" gridline sits where 23% should, and a correct 19% bar
+  visibly pierces it, scanning as ">20%"). Derive gridline positions, tick-label positions,
+  and bar/point positions from the SAME `value→pixel` function — never place the grid or its
+  labels by hand at eyeballed offsets. Verify ON THE RENDER that the gridline labeled `V` sits
+  exactly at the top of a hypothetical value-`V` bar, that the baseline gridline is at 0, and
+  that each bar lands on its own value's gridline. (This is §19d "geometric truth" for charts:
+  a misaligned reference grid is a fabricated reading even when the underlying numbers are right.)
 - **No triplicated magnitude.** Don't print the same number three ways in one row
   (label-count + in-bar count + percent). Pick the two that carry distinct meaning.
 

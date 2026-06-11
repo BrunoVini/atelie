@@ -69,6 +69,11 @@ rules that decide whether a deck persuades:
   don't let a beautiful slide stall the argument. The closing slide states one clear
   ask. Keep any section-numbering/eyebrow system consistent and off-by-one-free
   (number all content sections or none — don't let the CTA read "07" of 8).
+- **Give the pivot its own beat; close once.** The turn the whole talk hinges on (the
+  reversal, the "but here's what changed", the surge→correction) earns a dedicated slide —
+  don't bury it in a chart caption, or the argument has no dramatic spine. And end on ONE
+  closing slide: two near-identical concluding slides (a "takeaways" then a near-duplicate
+  "summary") dilute the landing — fold them into a single decisive takeaway.
 
 ## Export (optional, ask first)
 
