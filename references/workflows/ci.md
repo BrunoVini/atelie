@@ -26,6 +26,48 @@ Drop `templates/ci/github-actions.yml` into the target repo as
 pure Python). Visual-regression (`diff_screens.mjs`) is opt-in because it needs a
 headless browser; keep the always-on gate to lint + contrast.
 
+## SARIF / code scanning
+
+Pass `--sarif <path>` to emit a [SARIF 2.1.0](https://sarifweb.azurewebsites.net/)
+report alongside the human output, so findings land in GitHub's **Security ›
+Code scanning** tab (and any SARIF consumer):
+
+```bash
+python3 scripts/check.py . --sarif atelier.sarif   # file (written on pass OR fail)
+python3 scripts/check.py . --sarif -               # SARIF JSON to stdout (human lines suppressed)
+```
+
+The SARIF is written **regardless of pass/fail**, then the process still exits
+0/1 — so findings surface in code-scanning while the gate keeps blocking merges.
+RuleId → level: drift → `atelier/design-lint` (warning), contrast →
+`atelier/contrast-audit` (error), house rules → `atelier/house-rule` (error),
+overlap risk → `atelier/overlap-risk` (critical→error / important→warning /
+polish→note; polish is reported even though it doesn't gate).
+
+### Reusable action
+
+Consumers can skip the copy-in workflow and use the composite action directly
+(it runs the gate, writes SARIF, uploads to code-scanning, and fails on a gate
+failure). Needs `security-events: write`:
+
+```yaml
+permissions: { contents: read, security-events: write }
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-python@v5
+    with: { python-version: "3.12" }
+  - uses: BrunoVini/atelier@v0.1.0
+    with:
+      path: .
+      # contract: design/design-tokens.json   # optional
+      # max-drift: 0                            # optional
+      # sarif-file: atelier.sarif               # optional
+      # upload: 'true'                          # optional
+```
+
+The copy-in `templates/ci/github-actions.yml` also ships an optional
+`design-check-sarif` job that does the same with inline steps.
+
 ## Azure DevOps
 
 `templates/ci/azure-pipelines.yml` is the equivalent for Azure Pipelines.

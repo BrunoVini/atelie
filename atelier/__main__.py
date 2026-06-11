@@ -8,7 +8,9 @@ Subcommands
     ``python3 scripts/check.py`` does. Exits 0 on pass, 1 on fail, 2 on a usage
     or no-contract error. Extra flags (``--contract``, ``--max-drift``,
     ``--allow-contrast-fail``, ``--max-overlap-risk``, ``--ratchet``,
-    ``--update-baseline``) are forwarded verbatim to the gate.
+    ``--update-baseline``, ``--sarif <path>``) are forwarded verbatim to the
+    gate. ``--sarif <path>`` writes a SARIF 2.1.0 report for code-scanning
+    (``-`` writes to stdout); it is emitted regardless of pass/fail.
 
 The gate is repo/directory-oriented (it walks the tree and resolves a contract
 from ``design/design-tokens.json`` or ``DESIGN.md``). It does not fetch URLs;
@@ -33,6 +35,7 @@ commands:
                  (design-lint, contrast-audit, house-rules, overlap-risk).
                  forwards: --contract <json> --max-drift N --allow-contrast-fail
                            --max-overlap-risk N --ratchet --update-baseline
+                           --sarif <path>  (SARIF 2.1.0; '-' = stdout)
 
 run `{PROG} check --help` for details. stdlib-only; no network, local paths only.
 """
@@ -44,10 +47,13 @@ def _cmd_check(argv):
         print(
             "usage: atelier check <path> [--contract <json>] [--max-drift N]\n"
             "                            [--allow-contrast-fail] [--max-overlap-risk N]\n"
-            "                            [--ratchet] [--update-baseline]\n\n"
+            "                            [--ratchet] [--update-baseline]\n"
+            "                            [--sarif <path>]\n\n"
             "Run the design gate on a local repo directory. Needs a contract:\n"
             "design/design-tokens.json or a DESIGN.md in the target. Exit 0=pass,\n"
-            "1=fail, 2=usage/no-contract."
+            "1=fail, 2=usage/no-contract.\n\n"
+            "--sarif <path>  write a SARIF 2.1.0 report (for GitHub code-scanning);\n"
+            "                use '-' for stdout. Written regardless of pass/fail."
         )
         return 0
     if not argv:

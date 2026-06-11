@@ -53,9 +53,55 @@ def run(repo, contract, max_drift=0, allow_contrast_fail=False, max_overlap_risk
 
     results["drift"] = drift
     results["contrast_fails"] = [f"{r['text']} on {r['surface']} ({r['ratio']}:1)" for r in fails]
+    # Additive structured contrast detail for SARIF/tooling consumers. Existing
+    # keys are unchanged; this is new and purely additive.
+    results["contrast_fails_detail"] = [
+        {"text": r["text"], "surface": r["surface"], "ratio": r["ratio"]} for r in fails
+    ]
     results["rule_violations"] = rule_violations
     results["overlap_risks"] = overlaps
     return results
+
+
+def _emit_sarif(results, repo, path):
+    """Write SARIF for *results* to *path* ('-' = stdout). Best-effort: never
+    let SARIF emission change the gate verdict beyond its own failure."""
+    from sarif import build_sarif
+    doc = build_sarif(results, repo)
+    text = json.dumps(doc, indent=2)
+    if path == "-":
+        print(text)
+        return
+    # Best-effort: an IO error here (e.g. parent path is a regular file) must NOT
+    # change the gate's 0/1 verdict, so swallow OSError after reporting it.
+    try:
+        parent = os.path.dirname(os.path.abspath(path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(text)
+    except OSError as e:
+        print(f"::error:: could not write SARIF to {path}: {e}")
+
+
+_MISSING = object()
+
+
+def _flag_value(args, name, default=None):
+    """Return the value following *name* in *args*, or *default* if absent.
+
+    Bounded: if *name* is the last arg with no value after it, print a clean
+    ``::error::`` and return *_MISSING* (a sentinel distinct from a real value or
+    *default*) instead of raising IndexError. Callers treat _MISSING as a usage
+    error. When *name* is absent entirely, returns *default*.
+    """
+    if name not in args:
+        return default
+    i = args.index(name)
+    if i + 1 >= len(args):
+        print(f"::error:: {name} requires a value")
+        return _MISSING
+    return args[i + 1]
 
 
 def main(argv=None):
@@ -73,14 +119,25 @@ def main(argv=None):
         return 2
     from contract import has_contract
     repo = args[0]
+    # All flags route through _flag_value so a flag given as the last arg with no
+    # value yields a clean usage error (return 2) instead of an IndexError.
     # Resolve from an explicit --contract, else the repo (design-tokens.json OR DESIGN.md).
-    contract = args[args.index("--contract") + 1] if "--contract" in args else repo
+    contract = _flag_value(args, "--contract", repo)
     cfg_path = os.path.join(repo, "design", "atelier.config.json")
     cfg = json.load(open(cfg_path)).get("check", {}) if os.path.exists(cfg_path) else {}
-    max_drift = int(args[args.index("--max-drift") + 1]) if "--max-drift" in args else cfg.get("max_drift", 0)
+    max_drift = _flag_value(args, "--max-drift") if "--max-drift" in args else cfg.get("max_drift", 0)
     allow_contrast = "--allow-contrast-fail" in args or cfg.get("allow_contrast_fail", False)
-    max_overlap = (int(args[args.index("--max-overlap-risk") + 1]) if "--max-overlap-risk" in args
+    max_overlap = (_flag_value(args, "--max-overlap-risk") if "--max-overlap-risk" in args
                    else cfg.get("max_overlap_risk", 0))
+    sarif_path = _flag_value(args, "--sarif", None)
+    # A flag present as the last arg with no value yields _MISSING -> usage error.
+    if _MISSING in (contract, max_drift, max_overlap, sarif_path):
+        return 2
+    if "--max-drift" in args:
+        max_drift = int(max_drift)
+    if "--max-overlap-risk" in args:
+        max_overlap = int(max_overlap)
+    sarif_to_stdout = sarif_path == "-"
     if not has_contract(contract):
         print(f"::error:: no contract for {contract} — need design/design-tokens.json or "
               "DESIGN.md (run generate-design-md first)")
@@ -114,6 +171,8 @@ def main(argv=None):
         # overlap keep their normal verdicts (don't silently drop three gates).
         res = run(repo, contract, max_drift=10**9, allow_contrast_fail=allow_contrast,
                   max_overlap_risk=max_overlap)
+        if sarif_path:
+            _emit_sarif(res, repo, sarif_path)
         drift_now = next(s["findings"] for s in res["steps"] if s["step"] == "design-lint")
         if drift_now < baseline:                       # real improvement -> tighten so it can't creep back
             try:
@@ -133,18 +192,23 @@ def main(argv=None):
         return 0 if ok else 1
 
     res = run(repo, contract, max_drift, allow_contrast, max_overlap)
-    for s in res["steps"]:
-        print(f"  [{'PASS' if s['ok'] else 'FAIL'}] {s['step']}: {json.dumps({k:v for k,v in s.items() if k not in ('step','ok')})}")
-    for d in res["drift"][:20]:
-        print(f"    drift {d['file']}:{d['line']} {d['value']} → {d['fix']}")
-    for c in res["contrast_fails"]:
-        print(f"    contrast {c}")
-    for v in res.get("rule_violations", [])[:20]:
-        tip = f" → use {v['prefer']}" if v.get("prefer") else ""
-        print(f"    house-rule {v['file']}:{v['line']} forbidden '{v['forbidden']}'{tip}")
-    for o in [f for f in res.get("overlap_risks", []) if f["severity"] in ("critical", "important")][:20]:
-        print(f"    overlap-risk {o['file']}:{o['line']} {o['kind']} — {o['detail']}")
-    print("\natelier check:", "PASS" if res["ok"] else "FAIL")
+    # Emit SARIF REGARDLESS of pass/fail, before returning the verdict. When
+    # writing to stdout ('-') suppress the human lines so stdout is valid JSON.
+    if sarif_path:
+        _emit_sarif(res, repo, sarif_path)
+    if not sarif_to_stdout:
+        for s in res["steps"]:
+            print(f"  [{'PASS' if s['ok'] else 'FAIL'}] {s['step']}: {json.dumps({k:v for k,v in s.items() if k not in ('step','ok')})}")
+        for d in res["drift"][:20]:
+            print(f"    drift {d['file']}:{d['line']} {d['value']} → {d['fix']}")
+        for c in res["contrast_fails"]:
+            print(f"    contrast {c}")
+        for v in res.get("rule_violations", [])[:20]:
+            tip = f" → use {v['prefer']}" if v.get("prefer") else ""
+            print(f"    house-rule {v['file']}:{v['line']} forbidden '{v['forbidden']}'{tip}")
+        for o in [f for f in res.get("overlap_risks", []) if f["severity"] in ("critical", "important")][:20]:
+            print(f"    overlap-risk {o['file']}:{o['line']} {o['kind']} — {o['detail']}")
+        print("\natelier check:", "PASS" if res["ok"] else "FAIL")
     return 0 if res["ok"] else 1
 
 

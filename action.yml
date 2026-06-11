@@ -1,0 +1,85 @@
+# atelier — design QA gate as a reusable GitHub Action.
+#
+# Runs the deterministic design gate (drift lint + contrast audit + house rules +
+# overlap risk), writes a SARIF 2.1.0 report, uploads it to GitHub code-scanning,
+# and fails the job iff the gate failed — so findings surface in the Security tab
+# AND still block the merge.
+#
+# Usage (consumer .github/workflows/atelier.yml):
+#
+#   permissions:
+#     contents: read
+#     security-events: write        # required for the SARIF upload
+#   jobs:
+#     design:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: actions/setup-python@v5
+#           with: { python-version: "3.12" }
+#         - uses: BrunoVini/atelier@v0.1.0
+#           with:
+#             path: .
+#             # contract: design/design-tokens.json   # optional
+#             # max-drift: 0                            # optional
+#             # sarif-file: atelier.sarif               # optional
+#             # upload: 'true'                          # optional
+name: atelier design check
+description: >-
+  Deterministic design QA gate (drift, contrast, house rules, overlap risk) with
+  SARIF output and code-scanning upload.
+author: BrunoVini
+
+inputs:
+  path:
+    description: Target repo directory to check.
+    required: false
+    default: "."
+  contract:
+    description: Explicit token contract (design/design-tokens.json). Optional; auto-resolved if omitted.
+    required: false
+    default: ""
+  max-drift:
+    description: Maximum allowed drift findings before the gate fails. Optional.
+    required: false
+    default: ""
+  sarif-file:
+    description: Path to write the SARIF 2.1.0 report.
+    required: false
+    default: "atelier.sarif"
+  upload:
+    description: Upload the SARIF report to GitHub code-scanning ('true'/'false').
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: atelier check (write SARIF, capture rc)
+      id: gate
+      shell: bash
+      run: |
+        args=("${{ inputs.path }}" --sarif "${{ inputs.sarif-file }}")
+        if [ -n "${{ inputs.contract }}" ]; then args+=(--contract "${{ inputs.contract }}"); fi
+        if [ -n "${{ inputs.max-drift }}" ]; then args+=(--max-drift "${{ inputs.max-drift }}"); fi
+        rc=0
+        python3 "$GITHUB_ACTION_PATH/scripts/check.py" "${args[@]}" || rc=$?
+        echo "rc=$rc" >> "$GITHUB_OUTPUT"
+        echo "atelier gate exit code: $rc"
+
+    - name: Upload SARIF to code-scanning
+      if: always() && inputs.upload == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+
+    - name: Fail job on gate failure
+      if: always()
+      shell: bash
+      run: |
+        rc="${{ steps.gate.outputs.rc }}"
+        if [ "$rc" != "0" ]; then
+          echo "::error::atelier design gate failed (exit $rc) — see the Security tab for SARIF findings."
+          exit "$rc"
+        fi
+        echo "atelier design gate passed."

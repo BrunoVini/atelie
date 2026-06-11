@@ -55,3 +55,34 @@ jobs:
             fi
           done
           exit $fail
+
+  # Optional: emit SARIF and surface findings in the GitHub Security tab (code
+  # scanning) while STILL failing the build on a gate failure. Needs
+  # `security-events: write`. Equivalent to the reusable `BrunoVini/atelier` action.
+  design-check-sarif:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: atelier check (write SARIF, capture rc)
+        id: gate
+        env:
+          ATELIER: ${{ github.workspace }}/.atelier/scripts
+        run: |
+          rc=0
+          python3 "$ATELIER/check.py" . --sarif atelier.sarif || rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+      - name: Upload SARIF to code-scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: atelier.sarif
+      - name: Fail on gate failure
+        if: always()
+        run: |
+          [ "${{ steps.gate.outputs.rc }}" = "0" ] || exit "${{ steps.gate.outputs.rc }}"
