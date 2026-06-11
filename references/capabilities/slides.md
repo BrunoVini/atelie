@@ -36,8 +36,18 @@ These are not polish; each is a real, judge-visible defect:
 - **Compose to the full slide — no bottom-of-slide voids.** Every slide fills its
   frame intentionally: balance the type, anchor the baseline grid, let content
   reach the lower third. A statement slide breathes *by design* (one line, vast
-  centered space), never by abandonment — a half-used canvas with a dead lower
-  band reads as unfinished, not minimal.
+  *centered* space), never by abandonment — a half-used canvas with a dead lower
+  band reads as unfinished, not minimal. The specific recurring defect: a
+  chart/content block that ends mid-slide leaving a ~150–250px empty horizontal
+  band between it and the footer. It is judged repeatedly and it is the easiest
+  point to lose. Kill it on a DATA slide by sizing the chart to the available
+  height (a taller chart, a baseline-anchored axis), adding a one-line takeaway or
+  source/annotation in that lower band, or using a full-height two-column layout —
+  not by leaving the gap. **Self-check on every rendered slide:** look at the
+  bottom third — if it's an accidental empty strip above the footer (not a
+  deliberately centered, balanced field), the slide is unfinished; rebalance it.
+  Centered negative space is symmetric (top ≈ bottom); a void is one-sided (content
+  top, dead air bottom).
 - **Number sections consistently and correctly.** If you run an eyebrow/section
   system, each section gets its own number and no number repeats across two
   different sections (don't ship two "03"s). Number all content sections or none
