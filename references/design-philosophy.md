@@ -82,7 +82,7 @@ The lookup is `references/knowledge/reflex-reject.csv` — per category, the ref
 fonts, the predictable post-correction aesthetic, the cliché hue anchors (named +
 hex), and a one-line hint toward a fresher direction. The automated guard is
 `scripts/cold_start_ledger.py`: pass `--category <cat>` to `check` and it warns when
-the proposed font is on that category's reflex list *or* the palette's dominant hue
+the proposed font is on that category's reflex list *or* any palette color
 sits within ΔE of a reflex anchor. This is orthogonal to the ledger's recent-output
 collision check — the reflex check fires even on the very first output, where there
 is nothing recent to collide with.

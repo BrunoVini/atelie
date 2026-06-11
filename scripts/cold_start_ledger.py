@@ -20,6 +20,7 @@ There are TWO orthogonal anti-sameness defenses:
 """
 import json
 import os
+import re
 import sys
 
 from scan_repo import _hex_to_rgb, _delta_e
@@ -107,9 +108,9 @@ def too_similar(fp, ledger=DEFAULT_LEDGER, n=RECENT):
 # Orthogonal to recent-collision: even atelier's very FIRST output for a category
 # can be the predictable "safe" choice for that category (every fintech →
 # emerald/teal + Space Grotesk). reflex-reject.csv curates those per category; this
-# warns when a proposed font is in the category's reflex font list OR the palette's
-# dominant hue sits within ΔE of a reflex hue anchor.
-_HEX_IN = __import__("re").compile(r"#[0-9a-fA-F]{3,8}\b")
+# warns when a proposed font is in the category's reflex font list OR any palette
+# color sits within ΔE of a reflex hue anchor.
+_HEX_IN = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 
 
 def _split_field(raw):
@@ -171,14 +172,22 @@ def reflex_reject_hit(font, palette, category, csv_path=REFLEX_CSV):
     nf = _norm_font(font)
     if nf and nf in row["fonts"]:
         reasons.append({"kind": "font", "matched": nf})
-    pal_rgbs = _palette_rgbs(palette)
+    # (rgb, hex) pairs from ONE filtered pass so the reported hex always corresponds to
+    # the rgb that matched — a "#" string that fails to parse is skipped in both.
+    pal_pairs = []
+    for h in (palette or []):
+        if isinstance(h, str) and h.startswith("#"):
+            try:
+                pal_pairs.append((_hex_to_rgb(h), h))
+            except Exception:
+                pass
     hue_hits = []
     for label, anchor in row["hues"]:
         try:
             a_rgb = _hex_to_rgb(anchor)
         except Exception:
             continue
-        for prgb, phex in zip(pal_rgbs, [h for h in (palette or []) if isinstance(h, str)]):
+        for prgb, phex in pal_pairs:
             if _delta_e(prgb, a_rgb) <= REFLEX_DELTA_E:
                 hue_hits.append({"palette": phex, "anchor": anchor, "label": label})
                 break

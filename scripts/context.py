@@ -28,14 +28,12 @@ import os
 import sys
 
 from contract import resolve_contract, validate_contract
-from scan_repo import detect_token_source, detect_framework
+from scan_repo import detect_token_source, detect_framework, _SKIP_DIRS, _STYLE_EXT
 
 # What "design signals" means for the gate: any styling surface that could
 # parameterize a contract — stylesheets, Tailwind config, a CSS/JS/TS theme, or a
-# tokens file — even when no DESIGN.md exists yet.
-_STYLE_EXT = (".css", ".scss", ".sass", ".less")
-_SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "out", "coverage",
-              "htmlcov", "playwright-report", "storybook-static", ".svelte-kit", "site", "_build"}
+# tokens file — even when no DESIGN.md exists yet. _SKIP_DIRS / _STYLE_EXT are imported
+# from scan_repo so the walk stays in lockstep with the scanner's own definitions.
 
 
 def _find_design_md(repo_dir):

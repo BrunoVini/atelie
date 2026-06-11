@@ -86,6 +86,21 @@ def test_category_reflex_palette_hue_match_fires(tmp_path):
     assert any(r["kind"] == "palette" for r in hit["reasons"])
 
 
+def test_palette_with_a_non_hex_string_reports_the_right_hex(tmp_path):
+    # regression: a non-hex string in the palette must not shift the reported label.
+    # The hue match must fire AND name the indigo that actually matched, not the
+    # leading non-hex token.
+    from cold_start_ledger import reflex_reject_hit
+    csv = _write_reflex(tmp_path)
+    hit = reflex_reject_hit("Helvetica", ["plainstring", "#6366f1"], "SaaS", csv_path=csv)
+    assert hit is not None
+    pal_reasons = [r for r in hit["reasons"] if r["kind"] == "palette"]
+    assert pal_reasons
+    matched = {h["palette"].lower() for r in pal_reasons for h in r["hits"]}
+    assert "#6366f1" in matched
+    assert "plainstring" not in matched
+
+
 def test_fresh_choice_in_known_category_does_not_fire(tmp_path):
     from cold_start_ledger import reflex_reject_hit
     csv = _write_reflex(tmp_path)
@@ -132,3 +147,25 @@ def test_category_warning_fires_in_cli_with_nonzero_exit(tmp_path):
                         "--category", "Fintech"], capture_output=True, text=True, env=env)
     assert r.returncode == 1
     assert "reflex" in r.stdout.lower()
+
+
+def test_products_and_reflex_reject_categories_stay_aligned():
+    # 1:1 guard: every product category must have a reflex-reject row and vice-versa.
+    # Without this, a new product category with no reflex row would silently stop the
+    # second-order check from firing — a red test beats silent rot.
+    import csv
+    import os
+    base = os.path.join(os.path.dirname(__file__), "..", "references", "knowledge")
+
+    def _cats(filename, column):
+        with open(os.path.join(base, filename), encoding="utf-8", newline="") as fh:
+            return {(row.get(column) or "").strip().lower()
+                    for row in csv.DictReader(fh) if (row.get(column) or "").strip()}
+
+    products = _cats("products.csv", "product_type")
+    reflex = _cats("reflex-reject.csv", "category")
+    only_products = sorted(products - reflex)
+    only_reflex = sorted(reflex - products)
+    assert products == reflex, (
+        f"products.csv vs reflex-reject.csv categories drifted; "
+        f"in products only: {only_products}; in reflex-reject only: {only_reflex}")
