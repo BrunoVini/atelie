@@ -123,6 +123,100 @@ def test_color_and_size_conversions():
     assert export_pptx.px_to_sz(96) == 7200      # 96px -> 72pt -> sz 7200
 
 
+def test_native_shape_rect_solid_fill(tmp_path):
+    """A spec slide with a shapes entry (fill, box, radius:0) emits a native
+    <p:sp> rect with a solidFill at the right EMU offset/extent — NOT a txBody."""
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "slide-1.png").write_bytes(_tiny_png())
+    spec = {"width": 1920, "height": 1080, "slides": [
+        {"bg": "media/slide-1.png", "texts": [], "shapes": [
+            {"x": 100, "y": 200, "w": 60, "h": 400, "fill": "rgb(40, 120, 200)", "radius": 0},
+        ]}]}
+    (tmp_path / "spec.json").write_text(json.dumps(spec))
+    out = tmp_path / "deck.pptx"
+    export_pptx.build(str(tmp_path), str(out))
+    z = zipfile.ZipFile(out)
+    s1 = z.read("ppt/slides/slide1.xml").decode()
+    parseString(s1)  # well-formed
+    # native rectangle geometry + solid fill with the bar's color
+    assert '<a:prstGeom prst="rect">' in s1
+    assert '<a:solidFill><a:srgbClr val="2878C8"/></a:solidFill>' in s1
+    # positioned at the right EMU offset/extent
+    assert f'<a:off x="{export_pptx.px_to_emu(100)}" y="{export_pptx.px_to_emu(200)}"/>' in s1
+    assert f'<a:ext cx="{export_pptx.px_to_emu(60)}" cy="{export_pptx.px_to_emu(400)}"/>' in s1
+    # the shape is a real shape, not a text box
+    shape_xml = export_pptx.shape(99, spec["slides"][0]["shapes"][0])
+    assert "<p:txBody>" not in shape_xml
+    assert 'txBox="1"' not in shape_xml
+
+
+def test_native_shape_rounded_rect(tmp_path):
+    """radius>0 -> prst="roundRect" with an adj <a:gd>."""
+    s = {"x": 0, "y": 0, "w": 200, "h": 100, "fill": "#ff0000", "radius": 25}
+    xml = export_pptx.shape(7, s)
+    assert '<a:prstGeom prst="roundRect">' in xml
+    assert "<a:avLst>" in xml
+    assert '<a:gd name="adj"' in xml
+    # N = round(50000 * radius / min(w,h)) = round(50000 * 25/100) = 12500
+    assert 'fmla="val 12500"' in xml
+    # capped at 50000
+    capped = export_pptx.shape(8, {"x": 0, "y": 0, "w": 100, "h": 100, "fill": "#000", "radius": 9999})
+    assert 'fmla="val 50000"' in capped
+
+
+def test_native_shape_border(tmp_path):
+    """A border -> an <a:ln> with the right color and EMU width."""
+    s = {"x": 0, "y": 0, "w": 200, "h": 100, "fill": "#ffffff", "radius": 0,
+         "border": {"color": "rgb(0, 0, 0)", "width": 2}}
+    xml = export_pptx.shape(5, s)
+    assert f'<a:ln w="{export_pptx.px_to_emu(2)}">' in xml
+    assert '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>' in xml
+    # a shape without a border carries no <a:ln>
+    plain = export_pptx.shape(6, {"x": 0, "y": 0, "w": 10, "h": 10, "fill": "#fff", "radius": 0})
+    assert "<a:ln" not in plain
+
+
+def test_shapes_z_order_bg_then_shapes_then_text(tmp_path):
+    """In a built slide, shapes render after the bg picture and before text frames."""
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "slide-1.png").write_bytes(_tiny_png())
+    spec = {"width": 1920, "height": 1080, "slides": [
+        {"bg": "media/slide-1.png",
+         "shapes": [{"x": 10, "y": 10, "w": 50, "h": 50, "fill": "#123456", "radius": 0}],
+         "texts": [{"x": 100, "y": 100, "w": 300, "h": 60, "text": "Label",
+                    "sizePx": 40, "color": "#000", "bold": False, "italic": False,
+                    "align": "l", "font": "Arial"}]}]}
+    (tmp_path / "spec.json").write_text(json.dumps(spec))
+    out = tmp_path / "deck.pptx"
+    export_pptx.build(str(tmp_path), str(out))
+    z = zipfile.ZipFile(out)
+    s1 = z.read("ppt/slides/slide1.xml").decode()
+    parseString(s1)
+    i_bg = s1.index('name="background"')
+    i_shape = s1.index('val="123456"')
+    i_text = s1.index("<a:t>Label</a:t>")
+    assert i_bg < i_shape < i_text
+
+
+def test_backward_compat_no_shapes_key(tmp_path):
+    """A spec with no shapes key still builds valid OOXML with bg + text only."""
+    spec_dir = _make_spec(tmp_path)  # this fixture has NO shapes key
+    out = spec_dir / "deck.pptx"
+    n = export_pptx.build(str(spec_dir), str(out))
+    assert n == 2
+    z = zipfile.ZipFile(out)
+    assert z.testzip() is None
+    for nm in z.namelist():
+        if nm.endswith(".xml") or nm.endswith(".rels"):
+            parseString(z.read(nm))
+    s1 = z.read("ppt/slides/slide1.xml").decode()
+    # no native shape rects beyond the text/bg shapes; text still present
+    assert "<a:t>Northwind</a:t>" in s1
+    assert 'r:embed="rIdImg"' in s1
+
+
 def test_xml_special_chars_are_escaped(tmp_path):
     media = tmp_path / "media"
     media.mkdir()

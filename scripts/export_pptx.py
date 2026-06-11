@@ -183,6 +183,7 @@ SLIDE = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
 <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/><a:chOff x="0" y="0"/><a:chExt cx="{cx}" cy="{cy}"/></a:xfrm></p:grpSpPr>
 {bg_pic}
+{native_shapes}
 {text_shapes}
 </p:spTree>
 </p:cSld>
@@ -238,6 +239,39 @@ def text_shape(shape_id, t):
     )
 
 
+def shape(shape_id, s):
+    """Emit a NATIVE, restylable OOXML rectangle for a captured solid-fill element.
+
+    `s` = {x,y,w,h (px), fill (css color), radius (px), border?{color,width}}.
+    radius>0 -> roundRect with an adj guide; an EMU-width <a:ln> when a border
+    exists. Reuses px_to_emu/css_color_to_hex so it shares the text path's basis.
+    """
+    x, y = px_to_emu(s["x"]), px_to_emu(s["y"])
+    w, h = float(s["w"]), float(s["h"])
+    cx, cy = px_to_emu(w), px_to_emu(h)
+    fill = css_color_to_hex(s.get("fill"))
+    radius = float(s.get("radius") or 0)
+    if radius > 0 and min(w, h) > 0:
+        adj = int(round(50000 * radius / min(w, h)))
+        adj = max(0, min(50000, adj))
+        geom = f'<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val {adj}"/></a:avLst></a:prstGeom>'
+    else:
+        geom = '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+    ln = ""
+    border = s.get("border")
+    if border and border.get("width"):
+        bw = px_to_emu(border["width"])
+        bcolor = css_color_to_hex(border.get("color"))
+        ln = f'<a:ln w="{bw}"><a:solidFill><a:srgbClr val="{bcolor}"/></a:solidFill></a:ln>'
+    return (
+        f'<p:sp><p:nvSpPr><p:cNvPr id="{shape_id}" name="shape {shape_id}"/>'
+        f'<p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
+        f'<p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
+        f'{geom}<a:solidFill><a:srgbClr val="{fill}"/></a:solidFill>{ln}</p:spPr>'
+        f'</p:sp>'
+    )
+
+
 def build(spec_dir, out_path):
     with open(os.path.join(spec_dir, "spec.json"), encoding="utf-8") as f:
         spec = json.load(f)
@@ -282,9 +316,15 @@ def build(spec_dir, out_path):
         bg_src = os.path.join(spec_dir, sld["bg"])
         with open(bg_src, "rb") as imf:
             media[f"ppt/media/{img_name}"] = imf.read()
-        shapes = [text_shape(3 + j, t) for j, t in enumerate(sld.get("texts", []))]
+        # ids: 1 = group, 2 = bg picture; native shapes then text frames after.
+        native = sld.get("shapes", [])
+        next_id = 3
+        native_shapes = [shape(next_id + j, s) for j, s in enumerate(native)]
+        next_id += len(native)
+        text_shapes = [text_shape(next_id + j, t) for j, t in enumerate(sld.get("texts", []))]
         files[f"ppt/slides/slide{idx}.xml"] = SLIDE.format(
-            cx=cx, cy=cy, bg_pic=BG_PIC.format(cx=cx, cy=cy), text_shapes="\n".join(shapes)
+            cx=cx, cy=cy, bg_pic=BG_PIC.format(cx=cx, cy=cy),
+            native_shapes="\n".join(native_shapes), text_shapes="\n".join(text_shapes),
         )
         files[f"ppt/slides/_rels/slide{idx}.xml.rels"] = SLIDE_RELS.format(img=img_name)
 

@@ -103,6 +103,76 @@ function extractScript() {
   };
 }
 
+// Collects "nativizable" solid-fill rectangles for the active slide root so the
+// PPTX writer can emit them as real, restylable shapes (bars, KPI blocks, rules,
+// panels) instead of baking them into the background image. Conservative on
+// purpose: anything with a gradient/image/SVG/canvas/video, or that fills ~the
+// whole slide (the background itself), stays baked.
+function shapeScript() {
+  return (rootSel) => {
+    const root = document.querySelector(rootSel);
+    if (!root) return [];
+    const rootR = root.getBoundingClientRect();
+    const slideArea = Math.max(1, rootR.width * rootR.height);
+    const hasAlpha = (color) => {
+      const m = /rgba?\(([^)]+)\)/.exec(color);
+      if (!m) return false;
+      const parts = m[1].split(',').map((p) => p.trim());
+      if (parts.length >= 4) return parseFloat(parts[3]) > 0;
+      return true; // rgb() with no alpha channel is opaque
+    };
+    const parseBorder = (cs) => {
+      const w = parseFloat(cs.borderTopWidth) || 0;
+      if (w <= 0 || cs.borderTopStyle === 'none' || cs.borderTopStyle === 'hidden') return null;
+      const c = cs.borderTopColor;
+      if (!hasAlpha(c)) return null;
+      return { color: c, width: w };
+    };
+    const shapes = [];
+    const walk = (el) => {
+      for (const child of el.children) {
+        const tag = child.tagName ? child.tagName.toLowerCase() : '';
+        // never nativize an art container; let it (and its subtree) bake.
+        if (tag === 'svg' || tag === 'canvas' || tag === 'img' || tag === 'video') continue;
+        const cs = getComputedStyle(child);
+        if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) { continue; }
+        const r = child.getBoundingClientRect();
+        const fill = cs.backgroundColor;
+        const qualifies =
+          cs.backgroundImage === 'none' &&            // no gradient / url()
+          fill && fill !== 'transparent' && hasAlpha(fill) &&
+          r.width >= 2 && r.height >= 2 &&
+          (r.width * r.height) < slideArea * 0.95 &&  // not the slide bg itself
+          !child.querySelector('svg, canvas, img, video'); // no un-translatable art inside
+        if (qualifies) {
+          const radius = Math.max(
+            parseFloat(cs.borderTopLeftRadius) || 0,
+            parseFloat(cs.borderTopRightRadius) || 0,
+            parseFloat(cs.borderBottomLeftRadius) || 0,
+            parseFloat(cs.borderBottomRightRadius) || 0,
+          );
+          const s = {
+            x: Math.round(r.left - rootR.left),
+            y: Math.round(r.top - rootR.top),
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+            fill,
+            radius: Math.round(radius),
+          };
+          const border = parseBorder(cs);
+          if (border) s.border = border;
+          child.setAttribute('data-pptx-shape', '');
+          shapes.push(s);
+        }
+        // keep descending in DOM order so nested blocks keep their z-order.
+        walk(child);
+      }
+    };
+    walk(root);
+    return shapes;
+  };
+}
+
 const slides = [];
 for (let i = 0; i < n; i++) {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
@@ -131,18 +201,23 @@ for (let i = 0; i < n; i++) {
   }, { idx: i, W, H, isDeck });
 
   const runs = await page.evaluate(extractScript(), rootSel);
+  // Collect nativizable solid-fill shapes (tags them with data-pptx-shape).
+  const shapes = await page.evaluate(shapeScript(), rootSel);
 
-  // Hide the text we captured, then screenshot the background (shapes/gradients/SVG/img).
+  // Hide the text AND the captured native shapes, then screenshot the background
+  // so it keeps ONLY un-translatable art (gradients, SVG, photos) — the bars,
+  // panels and rules we nativized are not doubled in the bg PNG.
   await page.evaluate((sel) => {
     const root = document.querySelector(sel);
     const isTextLeaf = (el) => Array.from(el.childNodes).some((nd) => nd.nodeType === 3 && nd.textContent.trim().length);
     const walk = (el) => { for (const c of el.children) { if (isTextLeaf(c)) c.style.visibility = 'hidden'; else walk(c); } };
     walk(root);
+    root.querySelectorAll('[data-pptx-shape]').forEach((el) => { el.style.visibility = 'hidden'; });
   }, rootSel);
 
   const bgRel = `media/slide-${i + 1}.png`;
   await page.locator(rootSel).screenshot({ path: path.join(outDir, bgRel) });
-  slides.push({ bg: bgRel, notes: notes[i] || '', texts: runs });
+  slides.push({ bg: bgRel, notes: notes[i] || '', texts: runs, shapes });
   await page.close();
 }
 

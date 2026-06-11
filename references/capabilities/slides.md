@@ -23,6 +23,33 @@ the contract; a deck is just another surface that must match the brand.
 4. Motion: slide-to-slide transitions are fine here (unlike narrated animations,
    which are one continuous motion). Keep them consistent and subtle.
 
+## Deck craft — defects that quietly cost you
+
+These are not polish; each is a real, judge-visible defect:
+
+- **Embed/inline every font (base64 woff2 in the deck).** A title slide that
+  falls back to a system serif because a face didn't load is a defect, not a
+  fallback — and it's the most-noticed slide in the deck. Subset to the weights
+  you use and inline them as `@font-face` so *no* slide ever degrades, online or
+  off. (See "Fonts & true offline use" below; for a judged deck, treat inlining
+  as the default, not the exception.)
+- **Compose to the full slide — no bottom-of-slide voids.** Every slide fills its
+  frame intentionally: balance the type, anchor the baseline grid, let content
+  reach the lower third. A statement slide breathes *by design* (one line, vast
+  centered space), never by abandonment — a half-used canvas with a dead lower
+  band reads as unfinished, not minimal.
+- **Number sections consistently and correctly.** If you run an eyebrow/section
+  system, each section gets its own number and no number repeats across two
+  different sections (don't ship two "03"s). Number all content sections or none
+  — and keep it off-by-one-free through the CTA.
+- **Build chart bars/segments as solid-fill rectangles, not baked gradients.** A
+  bar drawn as a `<div>` with a flat `background-color` (no gradient, no image,
+  no inner SVG) exports as a **native, restylable PPTX shape** — the recipient can
+  recolor it in PowerPoint. A bar painted with a CSS gradient or rendered inside an
+  `<svg>`/`<canvas>` bakes into the background image and can't be restyled. Same
+  for KPI/accent blocks, rules, and solid panels: flat fills nativize, gradients
+  bake. Reserve gradients for genuinely un-translatable art.
+
 ## The narrative carries the deck — design serves the story
 
 A pitch/keynote is judged on its *argument*, not just its surfaces. Two content
@@ -54,13 +81,19 @@ browser; `export PATH="$HOME/.local/bin:$PATH"` first if ffmpeg/chromium live th
   any zoom — not an image bed. Works on any page too (infographics: pass `--format A4` or
   `--width/--height`, or let the page's own `@page` rule win).
 - **PPTX — editable, two steps, stdlib-only on the Python side:**
-  1. `node scripts/extract_deck.mjs <deck.html> <specDir>` — captures each slide's text-free
-     background PNG (gradients/SVG/shapes survive) + every text run's box, font, color, align.
-  2. `python3 scripts/export_pptx.py <specDir> <out.pptx>` — lays each background full-bleed
-     with a **real, editable PowerPoint text frame** over every run. Opens looking identical,
-     but every word is selectable/editable — not an image-bed fake.
-  Honest limit: shapes/photos ride in the background image, so only TEXT is individually
-  editable (that trade buys perfect fidelity with no layout-engine guesswork). Speaker-notes
+  1. `node scripts/extract_deck.mjs <deck.html> <specDir>` — captures each slide's text runs
+     (box/font/color/align) AND its **nativizable shapes** (solid-fill rectangles: bars,
+     KPI/accent blocks, rules, panels — with corner radius and any solid border), then hides
+     both and screenshots a background PNG that keeps only un-translatable art
+     (gradients/SVG/photos/complex backgrounds).
+  2. `python3 scripts/export_pptx.py <specDir> <out.pptx>` — lays each background full-bleed,
+     then emits every shape as a **native, restylable OOXML object** (`<a:prstGeom>` rect /
+     roundRect with `solidFill` + optional `<a:ln>`) and every text run as a **real, editable
+     text frame**. Z-order is bg < shapes < text. Opens looking identical, but words AND
+     simple shapes are individually selectable/editable in PowerPoint — not an image-bed fake.
+  Honest limit: only genuinely un-translatable art (gradients, SVG paths, photos, complex
+  backgrounds) rides in the background image — so author chart bars/KPI blocks as flat
+  solid-fill rects (see "Deck craft" above) to keep them native and restylable. Speaker-notes
   export is not yet wired into the PPTX path — note that if the user needs editable notes.
 
 **Fonts & true offline use.** A Google-Fonts `<link>` is fine for most decks (the deck
