@@ -174,6 +174,38 @@ function handleRequest(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
     res.end(fs.readFileSync(filePath));
+  } else if (req.method === 'POST' && req.url === '/variants') {
+    // Live refine picker: ask edit_apply.py for contract-bound variants in one of three
+    // modes (range | steps | toggle). Read-only — it shells the SAME script the /edit/
+    // routes use but only the `variants` subcommand, which never writes a file. Every
+    // returned variant is already proven on-contract by the engine's guard.
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', () => {
+      let payload;
+      try { payload = JSON.parse(body || '{}'); }
+      catch { res.writeHead(400); return res.end(JSON.stringify({ ok: false, reason: 'bad json' })); }
+      if (!PROJECT_DIR) {
+        res.writeHead(400);
+        return res.end(JSON.stringify({ ok: false, reason: 'no project dir — start with --project-dir for variants' }));
+      }
+      const editScript = path.join(path.resolve(__dirname, '..'), 'edit_apply.py');
+      const mode = String(payload.mode || '');
+      if (!['range', 'steps', 'toggle'].includes(mode)) {
+        res.writeHead(400);
+        return res.end(JSON.stringify({ ok: false, reason: 'mode must be range|steps|toggle' }));
+      }
+      // Contract defaults to the project's own contract (repo dir); a caller may override.
+      const contract = payload.contract ? String(payload.contract) : path.resolve(PROJECT_DIR);
+      const args = ['variants', '--mode', mode, '--contract', contract,
+                    '--current', JSON.stringify(payload.current || {}), '--n', String(payload.n || 3)];
+      if (payload.prop) { args.push('--prop', String(payload.prop)); }
+      execFile('python3', [editScript, ...args], { timeout: 15000 }, (err, stdout, stderr) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end((stdout && stdout.trim())
+          || JSON.stringify({ ok: false, reason: (stderr || String(err || 'variants failed')).trim() }));
+      });
+    });
   } else if (req.method === 'POST' && req.url.startsWith('/edit/')) {
     // Live element iteration: accept an edit back into source, or revert one. The
     // heavy guards live in scripts/edit_apply.py (generated-file refusal, unique
