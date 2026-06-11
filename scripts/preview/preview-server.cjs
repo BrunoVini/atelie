@@ -82,6 +82,10 @@ const CONTENT_DIR = path.join(SESSION_DIR, 'content');
 const STATE_DIR = path.join(SESSION_DIR, 'state');
 // The repo root, so the preview can serve the project's DESIGN.md tokens at /design/.
 const PROJECT_DIR = process.env.ATELIER_PROJECT_DIR || '';
+// Session token for write/control endpoints (/variants, /edit/*). Overridable via env so
+// the driving agent can pass a known value; otherwise random per server start. Printed in
+// the startup JSON line and injected into the page so the same-origin client can echo it.
+const SESSION_TOKEN = process.env.ATELIER_TOKEN || crypto.randomBytes(24).toString('hex');
 let ownerPid = process.env.ATELIER_OWNER_PID ? Number(process.env.ATELIER_OWNER_PID) : null;
 
 const MIME_TYPES = {
@@ -107,7 +111,54 @@ p { opacity: 0.7; }</style>
 
 const frameTemplate = fs.readFileSync(path.join(__dirname, 'frame.html'), 'utf-8');
 const helperScript = fs.readFileSync(path.join(__dirname, 'client.js'), 'utf-8');
-const helperInjection = '<script>\n' + helperScript + '\n</script>';
+// Prepend a tiny same-origin <script> exposing the session token as window.__atelierToken
+// so the in-page client can echo it back as X-Atelier-Token on control POSTs (validated by
+// tokenOk). A cross-origin attacker can't read it, so it can't forge a write.
+const helperInjection = '<script>window.__atelierToken=' + JSON.stringify(SESSION_TOKEN) + ';</script>\n'
+  + '<script>\n' + helperScript + '\n</script>';
+
+// ========== Security helpers (pure, exported for unit tests) ==========
+
+// Anti-DNS-rebinding host guard. A malicious external page can rebind its DNS to 127.0.0.1
+// and drive this local server through the victim's browser; defense is to validate the
+// Host header. Strip the port and accept only loopback/local names plus the configured
+// bind host and url-host. Empty/missing → false, external (evil.com) → false. This server
+// is a LOCAL dev tool — only localhost origins are legitimate.
+function isAllowedHost(hostHeader, opts) {
+  if (!hostHeader || typeof hostHeader !== 'string') return false;
+  opts = opts || {};
+  var host = hostHeader.trim();
+  var bare;
+  if (host.charAt(0) === '[') {                   // bracketed IPv6 literal: "[::1]:port"
+    var close = host.indexOf(']');
+    bare = close !== -1 ? host.slice(0, close + 1) : host;
+  } else {
+    bare = host.split(':')[0];
+  }
+  bare = bare.toLowerCase();
+  var allowed = ['localhost', '127.0.0.1', '[::1]', '::1'];
+  if (opts.allowedHosts && opts.allowedHosts.length) {
+    for (var i = 0; i < opts.allowedHosts.length; i++) {
+      if (opts.allowedHosts[i]) allowed.push(String(opts.allowedHosts[i]).toLowerCase());
+    }
+  }
+  return allowed.indexOf(bare) !== -1;
+}
+
+// Constant-time compare of the request's X-Atelier-Token header to the session token.
+// Guards length mismatch (timingSafeEqual throws on unequal lengths) and missing tokens.
+function tokenOk(req, token) {
+  if (!token) return false;
+  var got = req && req.headers ? req.headers['x-atelier-token'] : undefined;
+  if (typeof got !== 'string' || got.length === 0) return false;
+  var a = Buffer.from(got);
+  var b = Buffer.from(String(token));
+  if (a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(a, b); } catch (_) { return false; }
+}
+
+// Hosts honored beyond the loopback set: the configured bind host and the url-host.
+const ALLOWED_HOSTS = [HOST, URL_HOST];
 
 // ========== Helper Functions ==========
 
@@ -134,6 +185,14 @@ function getNewestScreen() {
 // ========== HTTP Request Handler ==========
 
 function handleRequest(req, res) {
+  // Anti-DNS-rebinding: reject any request whose Host header is not loopback/local. Applies
+  // to ALL requests — only localhost origins are legitimate for this local dev tool. No CORS
+  // headers are ever set anywhere in this server: responses are same-origin only by design.
+  if (!isAllowedHost(req.headers && req.headers.host, { allowedHosts: ALLOWED_HOSTS })) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, reason: 'host not allowed (atelier is local-only)' }));
+    return;
+  }
   touchActivity();
   if (req.method === 'GET' && req.url === '/') {
     const screenFile = getNewestScreen();
@@ -175,6 +234,12 @@ function handleRequest(req, res) {
     res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
     res.end(fs.readFileSync(filePath));
   } else if (req.method === 'POST' && req.url === '/variants') {
+    // Session-token gate (before body parsing): the same-origin client echoes
+    // window.__atelierToken as X-Atelier-Token; a cross-origin attacker can't read it.
+    if (!tokenOk(req, SESSION_TOKEN)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, reason: 'missing or invalid session token' }));
+    }
     // Live refine picker: ask edit_apply.py for contract-bound variants in one of three
     // modes (range | steps | toggle). Read-only — it shells the SAME script the /edit/
     // routes use but only the `variants` subcommand, which never writes a file. Every
@@ -207,6 +272,11 @@ function handleRequest(req, res) {
       });
     });
   } else if (req.method === 'POST' && req.url.startsWith('/edit/')) {
+    // Session-token gate (before body parsing) — these routes WRITE to source.
+    if (!tokenOk(req, SESSION_TOKEN)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, reason: 'missing or invalid session token' }));
+    }
     // Live element iteration: accept an edit back into source, or revert one. The
     // heavy guards live in scripts/edit_apply.py (generated-file refusal, unique
     // anchor, journaled undo); here we ALSO confine writes to inside the project.
@@ -249,6 +319,11 @@ function handleRequest(req, res) {
 const clients = new Set();
 
 function handleUpgrade(req, socket) {
+  // Anti-DNS-rebinding also applies to the ws upgrade: reject the socket if the Host header
+  // is not loopback/local (a rebound external page could otherwise open a control socket).
+  if (!isAllowedHost(req.headers && req.headers.host, { allowedHosts: ALLOWED_HOSTS })) {
+    socket.destroy(); return;
+  }
   const key = req.headers['sec-websocket-key'];
   if (!key) { socket.destroy(); return; }
 
@@ -424,7 +499,8 @@ function startServer() {
     const info = JSON.stringify({
       type: 'server-started', port: Number(PORT), host: HOST,
       url_host: URL_HOST, url: 'http://' + URL_HOST + ':' + PORT,
-      screen_dir: CONTENT_DIR, state_dir: STATE_DIR
+      screen_dir: CONTENT_DIR, state_dir: STATE_DIR,
+      token: SESSION_TOKEN                          // so the driving agent can authenticate
     });
     console.log(info);
     fs.writeFileSync(path.join(STATE_DIR, 'server-info'), info + '\n');
@@ -435,4 +511,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { computeAcceptKey, encodeFrame, decodeFrame, OPCODES };
+module.exports = { computeAcceptKey, encodeFrame, decodeFrame, OPCODES, isAllowedHost, tokenOk };

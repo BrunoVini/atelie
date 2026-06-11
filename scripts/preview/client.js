@@ -87,17 +87,26 @@
   // Live element iteration (view -> edit). Accept a tweak back into source, or undo
   // it. The server confines edits to the project dir and edit_apply.py journals a
   // backup before writing, so apply is always reversible (capabilities/preview.md).
+  // Build POST headers that echo the session token (window.__atelierToken, injected
+  // same-origin by the server) as X-Atelier-Token so the server's token gate accepts the
+  // write. A cross-origin attacker can't read the token, so it can't forge a request.
+  function postHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    try { if (window.__atelierToken) h['X-Atelier-Token'] = window.__atelierToken; } catch (_) {}
+    return h;
+  }
+
   window.atelier = {
     applyEdit: (file, oldSnippet, newSnippet) =>
-      fetch('/edit/apply', { method: 'POST',
+      fetch('/edit/apply', { method: 'POST', headers: postHeaders(),
         body: JSON.stringify({ file: file, old: oldSnippet, new: newSnippet }) }).then(r => r.json()),
     revertEdit: (journalId) =>
-      fetch('/edit/revert', { method: 'POST',
+      fetch('/edit/revert', { method: 'POST', headers: postHeaders(),
         body: JSON.stringify({ journal_id: journalId }) }).then(r => r.json()),
     // Refine picker (capabilities/refine.md): ask the server for contract-bound variants
     // in one of three modes. Returns the parsed { ok, variants } payload. Read-only.
     variants: (mode, opts = {}) =>
-      fetch('/variants', { method: 'POST',
+      fetch('/variants', { method: 'POST', headers: postHeaders(),
         body: JSON.stringify({ mode: mode, prop: opts.prop, current: opts.current || {}, n: opts.n, contract: opts.contract }) })
         .then(r => r.json())
   };

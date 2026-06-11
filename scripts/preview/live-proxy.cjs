@@ -21,6 +21,7 @@ const http = require('http');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+const crypto = require('crypto');
 const { URL } = require('url');
 const { execFile } = require('child_process');
 
@@ -28,7 +29,21 @@ const { execFile } = require('child_process');
 const clientPath = path.join(__dirname, 'live-client.js');
 let CLIENT_SRC = '';
 try { CLIENT_SRC = fs.readFileSync(clientPath, 'utf-8'); } catch (_) { CLIENT_SRC = ''; }
-const INJECTION = '\n<script data-atelier-live="1">\n' + CLIENT_SRC + '\n</script>\n';
+
+// Build the injected markup for a given client source + optional session token. When a
+// token is present we prepend a tiny same-origin <script> that exposes it as
+// window.__atelierToken so the in-page client can echo it back on control POSTs (the
+// server then validates it — see tokenOk). Pure string builder, unit-tested.
+function buildInjection(clientSrc, token) {
+  var tokenScript = (token != null && token !== '')
+    ? '<script>window.__atelierToken=' + JSON.stringify(String(token)) + ';</script>\n'
+    : '';
+  return '\n' + tokenScript + '<script data-atelier-live="1">\n' + (clientSrc || '') + '\n</script>\n';
+}
+
+// Default (token-less) injection — kept exported so existing unit tests that call inject()
+// with the module-level INJECTION (no per-server token) stay green.
+const INJECTION = buildInjection(CLIENT_SRC, null);
 
 // Inject the client <script> before </body> (or </html> fallback, or append). Idempotent:
 // if the marker is already present (e.g. a double-proxy), it is NOT injected twice. Pure
@@ -61,6 +76,50 @@ function shouldInject(headers) {
   return enc === '' || enc === 'identity';
 }
 
+// ── anti-DNS-rebinding host guard (pure, exported) ────────────────────────────
+// A malicious external page can rebind its DNS to 127.0.0.1 and drive this local server
+// through the victim's browser. Defense: only honor requests whose Host header names a
+// loopback/local name. We strip the port and compare against the loopback set plus any
+// explicitly-configured bind host (server --host / the url-host). Empty/missing → false,
+// external (evil.com) → false. atelier is a LOCAL dev tool; only localhost is legitimate.
+function isAllowedHost(hostHeader, opts) {
+  if (!hostHeader || typeof hostHeader !== 'string') return false;
+  opts = opts || {};
+  // Strip the port. IPv6 literals come bracketed ("[::1]:1234"); keep the bracket form
+  // and also accept the bare "::1" so both shapes are honored.
+  var host = hostHeader.trim();
+  var bare;
+  if (host.charAt(0) === '[') {
+    var close = host.indexOf(']');
+    bare = close !== -1 ? host.slice(0, close + 1) : host;   // "[::1]"
+  } else {
+    bare = host.split(':')[0];                                // "localhost" / "127.0.0.1"
+  }
+  bare = bare.toLowerCase();
+  var allowed = ['localhost', '127.0.0.1', '[::1]', '::1'];
+  if (opts.allowedHosts && opts.allowedHosts.length) {
+    for (var i = 0; i < opts.allowedHosts.length; i++) {
+      var h = opts.allowedHosts[i];
+      if (h) allowed.push(String(h).toLowerCase());
+    }
+  }
+  return allowed.indexOf(bare) !== -1;
+}
+
+// ── session token (pure, exported) ────────────────────────────────────────────
+// Constant-time compare of the request's X-Atelier-Token header to the server's session
+// token. Guards length mismatch (timingSafeEqual throws on unequal-length buffers) and a
+// missing/empty configured token (no token configured => nothing can authenticate).
+function tokenOk(req, token) {
+  if (!token) return false;
+  var got = req && req.headers ? req.headers['x-atelier-token'] : undefined;
+  if (typeof got !== 'string' || got.length === 0) return false;
+  var a = Buffer.from(got);
+  var b = Buffer.from(String(token));
+  if (a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(a, b); } catch (_) { return false; }
+}
+
 // ── CLI parsing ──────────────────────────────────────────────────────────────
 function parseArgs(argv) {
   const out = { injectOnly: false };
@@ -71,6 +130,7 @@ function parseArgs(argv) {
     else if (a === '--host') out.host = argv[++i];
     else if (a === '--project-dir') out.projectDir = argv[++i];
     else if (a === '--journal-dir') out.journalDir = argv[++i];
+    else if (a === '--token') out.token = argv[++i];
     else if (a === '--inject-only') out.injectOnly = true;
   }
   return out;
@@ -106,6 +166,18 @@ function isConfined(file, projectDir) {
 function handleControl(req, res, opts) {
   const scriptsDir = path.resolve(__dirname, '..');
   const journalDir = opts.journalDir || path.join(require('os').tmpdir(), 'atelier-live', 'journal');
+
+  // Session-token gate — runs BEFORE project-dir/body parsing on EVERY control route
+  // (/__atelier/*). The same-origin in-page client echoes window.__atelierToken back as
+  // the X-Atelier-Token header; a cross-origin attacker can't read that token, so it can't
+  // forge a valid write. Missing/wrong token => 403 (does not regress the no-project-dir
+  // 403 test, which simply trips this gate first). No CORS headers here by design —
+  // responses are same-origin only (see makeServer).
+  if (!tokenOk(req, opts.token)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end('{"ok":false,"reason":"missing or invalid session token"}');
+    return true;
+  }
 
   if (req.url === '/__atelier/variants' && req.method === 'POST') {
     readBody(req, (p) => {
@@ -188,7 +260,8 @@ function proxyRequest(req, res, opts) {
       proxyRes.on('end', () => {
         let html;
         try { html = Buffer.concat(chunks).toString('utf-8'); } catch (_) { html = ''; }
-        const injected = inject(html);
+        // Use this server instance's injection (embeds the session token) if provided.
+        const injected = inject(html, opts.injection);
         const outHeaders = Object.assign({}, proxyRes.headers);
         delete outHeaders['content-length'];       // body length changed
         delete outHeaders['content-encoding'];
@@ -213,8 +286,24 @@ function proxyRequest(req, res, opts) {
 }
 
 function makeServer(opts) {
+  opts = opts || {};
+  // Per-instance session token (overridable via --token / ATELIER_TOKEN so the driving
+  // agent knows it) and the matching injection that embeds it into the page.
+  if (!opts.token) opts.token = crypto.randomBytes(24).toString('hex');
+  if (opts.injection == null) opts.injection = buildInjection(CLIENT_SRC, opts.token);
+  // Hosts we accept beyond the loopback set: the configured bind host and the url-host.
+  const allowedHosts = [opts.host, opts.host === '127.0.0.1' ? 'localhost' : opts.host];
+
   const server = http.createServer((req, res) => {
     try {
+      // Anti-DNS-rebinding: reject any request whose Host header is not loopback/local.
+      // Applies to ALL requests (proxy + control) — only localhost origins are legitimate
+      // for a local dev tool. No CORS headers are ever set: responses are same-origin only.
+      if (!isAllowedHost(req.headers && req.headers.host, { allowedHosts: allowedHosts })) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end('{"ok":false,"reason":"host not allowed (atelier is local-only)"}');
+        return;
+      }
       if (req.url && req.url.indexOf('/__atelier') === 0) {
         if (handleControl(req, res, opts)) return;
         res.writeHead(404); res.end('{"ok":false,"reason":"unknown control route"}'); return;
@@ -231,6 +320,13 @@ function makeServer(opts) {
   // the injected client degrades gracefully (live-mode.md documents the limitation).
   server.on('upgrade', (req, clientSocket, head) => {
     try {
+      // Anti-DNS-rebinding also applies to the ws upgrade: reject the socket if the Host
+      // header is not loopback/local (a rebound external page could otherwise open a
+      // control/HMR socket through the victim's browser).
+      if (!isAllowedHost(req.headers && req.headers.host, { allowedHosts: allowedHosts })) {
+        try { clientSocket.destroy(); } catch (_) {}
+        return;
+      }
       const up = new URL(opts.upstream);
       const upstreamSocket = net.connect(up.port || 80, up.hostname, () => {
         // Re-send the upgrade request line + headers to the upstream verbatim.
@@ -263,16 +359,23 @@ function main() {
   }
   const port = opts.port || (49152 + Math.floor(Math.random() * 16383));
   const host = opts.host || '127.0.0.1';
+  opts.host = host;
+  opts.port = port;
+  // Token precedence: --token flag, then ATELIER_TOKEN env, then a random one. makeServer
+  // fills in a random token if still unset and builds the matching injection.
+  if (!opts.token) opts.token = process.env.ATELIER_TOKEN || '';
   const server = makeServer(opts);
   server.listen(port, host, () => {
     console.log(JSON.stringify({
       type: 'live-proxy-started', port: port, host: host,
       url: 'http://' + (host === '127.0.0.1' ? 'localhost' : host) + ':' + port,
       upstream: opts.upstream, inject_only: !!opts.injectOnly,
+      token: opts.token,                          // so the driving agent can authenticate
     }));
   });
 }
 
 if (require.main === module) main();
 
-module.exports = { inject, isHtml, shouldInject, isConfined, parseArgs, makeServer, INJECTION };
+module.exports = { inject, isHtml, shouldInject, isConfined, parseArgs, makeServer,
+                   INJECTION, buildInjection, isAllowedHost, tokenOk };
