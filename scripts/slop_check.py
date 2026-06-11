@@ -85,6 +85,78 @@ _CLICHES = re.compile(
     r"built for the modern|delight your (?:users|customers))\b", re.I)
 _VAGUE_CTA = {"learn more", "read more", "click here", "discover", "explore",
               "find out more", "see more", "see how"}
+# --- second-order marketing micro-tells -------------------------------------------
+# The "safe" marketing voice that survives a first cliché-scrub but still reads
+# generated: launch openers, retrofit slogans, "just works" reassurance, growth-hack
+# multipliers, AI-as-the-whole-pitch, autopilot/simplified framings, superlative stacks.
+# Each pattern is its own labelled tell. These are SCOPED to not overlap _CLICHES
+# (which already owns reimagine/supercharge/the-future-of/say-goodbye/built-for-modern),
+# and use word boundaries / required structure so real prose ("a faster build", "the
+# modern stack", "powered by Postgres") does not trip them.
+_MICRO_TELLS = (
+    # "Meet <Product>" hero opener. The following token must be Capitalized (a product
+    # name) so "meet the team" stays safe — AND it must be in HERO/HEADLINE position
+    # (start-of-string, after a newline, or after a `>`), so mid-sentence prose like
+    # "come meet Sarah at the booth" and "we meet GDPR requirements" never trips it.
+    ("meet-product",
+     re.compile(r"(?:^|[>\n])\s*[Mm][Ee][Ee][Tt]\s+[A-Z][A-Za-z0-9]+\b")),
+    # "X, reimagined" / "<noun>, reinvented" retrofit slogan (comma + past participle)
+    ("noun-reimagined",
+     re.compile(r",\s*(?:reimagined|reinvented|redefined|rethought)\b", re.I)),
+    # "the only X you'll ever need"
+    ("only-youll-ever-need",
+     re.compile(r"\bthe only\b.{0,40}?\byou'?ll ever need\b", re.I)),
+    # "X that just works"
+    ("just-works",
+     re.compile(r"\bthat just works\b", re.I)),
+    # "10x your <noun>" / "2x your growth" growth-hack multiplier
+    ("multiplier-your-noun",
+     re.compile(r"\b\d+x\s+your\s+\w+", re.I)),
+    # "ship faster" / "ship 10x" / "ship x10"
+    ("ship-faster",
+     re.compile(r"\bship\s+(?:faster|10x|x10)\b", re.I)),
+    # "from idea to <noun> in minutes/seconds"
+    ("idea-to-x-in-time",
+     re.compile(r"\bfrom idea to\b.{0,40}?\bin (?:minutes|seconds|hours|a day)\b", re.I)),
+    # "No more <noun>." pain-removal slogan. Two guards keep ordinary prose safe:
+    # (a) a negative lookahead on `than`, so pricing copy "no more than 3 users" is safe;
+    # (b) SLOGAN position — start-of-string, after a newline, after `>`, or right after
+    #     sentence-ending punctuation — so mid-sentence "there are no more meetings on
+    #     Friday" / "see no more clearly" never trips it.
+    ("no-more-noun",
+     re.compile(r"(?:^|[>\n]|(?<=[.!?:]))\s*no more\s+(?!than\b)\w+", re.I)),
+    # "say hello to"
+    ("say-hello-to",
+     re.compile(r"\bsay hello to\b", re.I)),
+    # "your <noun>, supercharged" (the comma+supercharged form _CLICHES' bare 'supercharge' misses)
+    ("noun-supercharged",
+     re.compile(r"\byour\s+\w+,\s*supercharged\b", re.I)),
+    # "powered by AI" used as the value prop (the literal slogan, not "powered by Postgres")
+    ("powered-by-ai",
+     re.compile(r"\bpowered by ai\b", re.I)),
+    # "built different"
+    ("built-different",
+     re.compile(r"\bbuilt different\b", re.I)),
+    # "<your-thing> on autopilot" marketing slogan. Require a (business) object before
+    # it and exclude literal-aviation/vehicle subjects, so "the plane flew on autopilot"
+    # / "the car drove on autopilot" don't trip the marketing tell.
+    ("on-autopilot",
+     re.compile(r"\b(?!plane|aircraft|jet|jets|car|cars|drone|drones|ship|boat|vessel|"
+                r"flew|drove)\w+\s+on autopilot\b", re.I)),
+    # "the modern way to <verb>"
+    ("modern-way-to",
+     re.compile(r"\bthe modern way to\b", re.I)),
+    # "X, simplified" (comma form; "simplify your workflow" in prose is safe)
+    ("noun-simplified",
+     re.compile(r",\s*simplified\b", re.I)),
+    # superlative stacking: "the fastest, simplest, most powerful" (3+ stacked superlatives)
+    ("superlative-stacking",
+     re.compile(r"\b(?:fastest|simplest|smartest|easiest|most \w+|best|cheapest|"
+                r"powerful|leanest|cleanest)\b\W+(?:and\s+)?\b(?:fastest|simplest|"
+                r"smartest|easiest|most \w+|best|cheapest|powerful|leanest|cleanest)\b"
+                r"\W+(?:and\s+)?\b(?:fastest|simplest|smartest|easiest|most \w+|best|"
+                r"cheapest|powerful|leanest|cleanest)\b", re.I)),
+)
 _SCROLL_CUE = re.compile(
     r"\b(scroll (?:to (?:explore|discover)|down|for more)|keep scrolling)\b", re.I)
 _SECTION_NUM = re.compile(r"(?<!\d)0[0-9]\s*[—–/·|]|"
@@ -168,6 +240,24 @@ def layout_variance(html):
     return []
 
 
+def _marketing_microtells(vt):
+    """Second-order marketing slop: the post-scrub "safe" voice that still reads
+    generated. One finding per distinct micro-tell matched, carrying the matched
+    `tell`. Conservative by construction (word boundaries / required structure) and
+    deduped per kind so a phrase can't fire the same tell twice."""
+    findings = []
+    for kind, rx in _MICRO_TELLS:
+        m = rx.search(vt)
+        if not m:
+            continue
+        hit = re.sub(r"\s+", " ", m.group(0)).strip()
+        findings.append({"severity": "polish", "kind": "marketing-microtell",
+                         "detail": f"marketing micro-tell (“{hit}”) — the post-scrub "
+                                   "‘safe’ marketing voice still reads generated; name the "
+                                   "specific outcome instead", "tell": hit})
+    return findings
+
+
 def _copy_tells(html):
     findings = []
     vt = _visible_text(html)
@@ -183,6 +273,7 @@ def _copy_tells(html):
         findings.append({"severity": "polish", "kind": "marketing-cliche",
                          "detail": f"marketing-cliché copy (“{m.group(0)}”) — say "
                                    "something specific instead", "tell": m.group(0)})
+    findings.extend(_marketing_microtells(vt))
     vague = sorted({c.lower() for c in _cta_labels(html) if c.lower() in _VAGUE_CTA})
     if vague:
         findings.append({"severity": "polish", "kind": "vague-cta",

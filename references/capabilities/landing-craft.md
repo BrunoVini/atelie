@@ -323,6 +323,58 @@ anti-sameness ledger — `cold_start_ledger.py` — so successive briefs don't c
 
 Ask: *is this the first look anyone would reach for, or one I chose on purpose?*
 
+## Reach-for: the moves that read *designed*
+
+The gates above are mostly "avoid". Avoidance gets you to clean; it does not tell you what
+to reach FOR. This is the positive palette: named alternatives to the defaults, so you can
+replace a reflex with a specific decision instead of just deleting it. Every genre's reflex
+fonts, styles, and hues live in `../knowledge/reflex-reject.csv`; its `reach_for` column names
+the concrete distinctive alternative for that exact genre. Read your genre's row before you
+choose, then commit to the move.
+
+**Type pairing — reach for a face with a point of view.** The defaults (Inter, Space Grotesk,
+Plus Jakarta, Geist, Fraunces) are competent and invisible. Pair a characterful display cut
+with a workhorse body that has its own texture: Söhne or ABC Diatype as a body that still
+reads owned; Reckless, GT Sectra, Canela, Lyon, Tiempos, or Editorial New as a display voice;
+Berkeley Mono or IBM Plex Mono reserved strictly for code and figures. Pick the cut the genre
+rewards (a luxury maison earns a high-contrast display; a dev tool earns a precise grotesk),
+set the hierarchy with scale and whitespace, and give every figure `tabular-nums`.
+
+**Focal-moment composition — reach for one deliberate break in the grid.** Instead of the
+centered hero pane, choose a single composition move and commit: a real artifact floated over
+the fold with a depth layer behind it; an asymmetric split where the product's actual state
+(a query→result, a before→after, a live value) carries the left and the claim carries the
+right; one living detail that proves the thing runs. The focal moment demonstrates the pitch;
+it is not decoration around it.
+
+**Color commitment — reach for the product's own material, not the genre hue.** The genre
+default hue (SaaS indigo, fintech emerald, health sky-blue, dev violet) is the tell. Source
+the palette from the product's literal job: a reconciliation tool's settle-green, a coffee
+box's roast browns, a track's red, the actual material of a luxury good, the customer's own
+industry color. The `reach_for` column states this per genre. One owned ground plus one
+sourced accent beats any default duo.
+
+**Copy voice — name the specific outcome.** The first-order clichés (the "unlock-the-power /
+next-level" register) are caught by `slop_check.py`'s `marketing-cliche`; the quieter second-order
+"safe" marketing voice is caught by `marketing-microtell` (the same check flags "X,
+reimagined", "that just works", "10x your <noun>", "the modern way to", "X, simplified", and
+their kin). Both are polish-severity prompts to rewrite. The fix is always the same: say the
+literal, checkable thing the product does. Before → after:
+
+- "Run your books on autopilot." → "Close the books in one pass: every transaction matched to
+  its receipt before you export."
+- "The modern way to invoice." → "Send an invoice, get paid by card or ACH, and see it
+  reconcile against the bank line the same day."
+- "Accounting, simplified." → "One ledger for receipts, invoices, and payroll — no
+  spreadsheet exports, no copy-paste between four tools."
+
+Each rewrite names the outcome a skeptic could check, which is exactly what the micro-tell
+was papering over. The reflex copy is interchangeable across products; the specific outcome
+could only describe this one.
+
+Ask: *for type, composition, color, and copy, did I name a specific decision — or did I just
+remove the default and leave the slot empty?*
+
 ## Definition of done for a landing surface
 
 Before you call a hero/landing page finished, all of these are "yes":
@@ -336,6 +388,9 @@ Before you call a hero/landing page finished, all of these are "yes":
 - [ ] **Honest proof** — no fabricated logo wall / named testimonials / invented stats;
       primary CTA + nav are wired (not a page of `aria-disabled` dead links)
 - [ ] **Owned aesthetic, not the genre default** (subverts the first-reach cliché)
+- [ ] **Reach-for, not just avoid** — type, composition, color, and copy each name a specific
+      decision (see this genre's `reach_for` in `../knowledge/reflex-reject.csv`); copy is clean
+      of `marketing-microtell`, every claim naming a checkable outcome
 - [ ] No template filler (no 3 clone cards, no number-grid standing in for product)
 - [ ] Product shown more than once, with **different** surfaces
 - [ ] Primary CTA is the loudest pixel at rest (glow/fill/arrow); secondary is quiet
