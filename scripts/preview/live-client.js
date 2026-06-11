@@ -24,10 +24,26 @@
     for (var k in styles) { try { el.style.setProperty(k, styles[k]); } catch (_) {} }
   }
 
-  // POST JSON to a control endpoint, resolve parsed JSON (or {ok:false,reason}).
+  // Is `el` something the user might be typing into? We must never steal focus from these
+  // (#241): selecting via alt+click must not blur an input/textarea/select/contenteditable.
+  function isEditableTarget(el) {
+    try {
+      if (!el) return false;
+      var tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    } catch (_) { return false; }
+  }
+
+  // POST JSON to a control endpoint, resolve parsed JSON (or {ok:false,reason}). Echoes the
+  // session token (window.__atelierToken, injected same-origin by the proxy) as
+  // X-Atelier-Token so the server's token gate accepts the write.
   function post(path, payload) {
+    var headers = { 'Content-Type': 'application/json' };
+    try { if (window.__atelierToken) headers['X-Atelier-Token'] = window.__atelierToken; } catch (_) {}
     return fetch(CONTROL + path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: headers,
       body: JSON.stringify(payload || {})
     }).then(function (r) { return r.json(); })
       .catch(function (e) { return { ok: false, reason: (e && e.message) || 'network error' }; });
@@ -102,6 +118,11 @@
             b.setAttribute('data-v', '1');
             b.style.cssText = 'background:#333;color:#fff;border:1px solid #555;border-radius:5px;'
               + 'padding:4px 8px;cursor:pointer;';
+            // Don't steal focus from whatever the user was typing in (#241): preventDefault
+            // on mousedown keeps the click firing without moving focus; tabIndex -1 keeps it
+            // out of the tab order entirely.
+            b.tabIndex = -1;
+            b.onmousedown = function (e) { e.preventDefault(); };
             b.onclick = function () { pick(v, b); };
             bar.appendChild(b);
           });
@@ -109,6 +130,8 @@
           accept.textContent = 'Accept (qa-gated)';
           accept.style.cssText = 'background:#2a7;color:#fff;border:0;border-radius:5px;'
             + 'padding:4px 10px;cursor:pointer;margin-left:6px;';
+          accept.tabIndex = -1;
+          accept.onmousedown = function (e) { e.preventDefault(); };   // never steal focus (#241)
           accept.onclick = function () {
             if (!chosen) { log('pick a variant first'); return; }
             if (opts.onAccept) opts.onAccept(chosen, el);
@@ -118,6 +141,8 @@
           reject.textContent = 'Reject';
           reject.style.cssText = 'background:#a33;color:#fff;border:0;border-radius:5px;'
             + 'padding:4px 10px;cursor:pointer;';
+          reject.tabIndex = -1;
+          reject.onmousedown = function (e) { e.preventDefault(); };   // never steal focus (#241)
           reject.onclick = function () { teardown(); };
           bar.appendChild(accept); bar.appendChild(reject);
         });
@@ -130,16 +155,28 @@
   }
 
   // Click-to-select: alt+click an element to pick it (alt avoids hijacking normal
-  // clicks in the user's app). Defensive — never preventDefault unless alt is held.
+  // clicks in the user's app). Defensive — never preventDefault unless alt is held. We must
+  // NOT disturb focus (#241): if the user is mid-edit in an input/textarea/contenteditable,
+  // alt+click still selects the target, but we never blur or refocus that editable element.
   function onClick(e) {
     try {
       if (!e.altKey) return;
+      // Preserve the editable element the user is typing in so a transient outline tweak
+      // below can't steal focus from it.
+      var active = null;
+      try { active = document.activeElement; } catch (_) {}
+      var keepFocus = isEditableTarget(active);
       e.preventDefault(); e.stopPropagation();
       selected = e.target;
       savedInline = selected.getAttribute('style') || '';
       log('selected <' + selected.tagName.toLowerCase() + '> — call atelier.openPicker()');
+      // Only paint a selection outline on the picked element; never call .focus() on it.
       selected.style.outline = '2px dashed #6cf';
       setTimeout(function () { try { selected && (selected.style.outline = ''); } catch (_) {} }, 600);
+      // If the user was editing, make sure focus is still where it was.
+      if (keepFocus && active && active !== document.activeElement) {
+        try { active.focus({ preventScroll: true }); } catch (_) {}
+      }
     } catch (_) {}
   }
 

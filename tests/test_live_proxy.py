@@ -157,18 +157,20 @@ def test_confinement_requires_project_dir_and_resolves_symlinks(tmp_path):
 
 
 def test_accept_and_revert_refused_without_project_dir():
-    # #4: /accept and /revert must 403 when started WITHOUT --project-dir (no
-    # confinement root => could write anywhere). Drive handleControl via makeServer's
+    # #4: /accept and /revert must 403 when started WITHOUT --project-dir (no confinement
+    # root => could write anywhere). Send a loopback Host header AND the correct token so
+    # the host guard and token gate both PASS and the request genuinely reaches the
+    # project-dir gate (the 403 we're asserting here). Drive handleControl via makeServer's
     # request handler with a fake req/res, no upstream needed for the 403 path.
     node = _node()
     if not node:
         pytest.skip("node not available")
     script = (
         "const p = require(%r);"
-        "const srv = p.makeServer({upstream:'http://127.0.0.1:1'});"  # no projectDir
+        "const srv = p.makeServer({upstream:'http://127.0.0.1:1', token:'t'});"  # no projectDir
         "function probe(url, cb){"
         "  let code=0, body='';"
-        "  const req = {url, method:'POST', headers:{}, on(){}, pipe(){}};"
+        "  const req = {url, method:'POST', headers:{host:'localhost','x-atelier-token':'t'}, on(){}, pipe(){}};"
         "  const res = {headersSent:false,"
         "    writeHead(c){code=c; this.headersSent=true;},"
         "    end(b){ if(b) body+=b; cb(code, body); }};"
@@ -184,3 +186,156 @@ def test_accept_and_revert_refused_without_project_dir():
     out = json.loads(r.stdout)
     assert out["accept"] == 403
     assert out["revert"] == 403
+
+
+# ── Phase A security hardening ────────────────────────────────────────────────
+
+def test_is_allowed_host_loopback_only():
+    # Anti-DNS-rebinding: loopback/local names allowed (with/without port, incl. IPv6
+    # literal); empty/missing and external hosts rejected.
+    out = _eval(
+        "["
+        "p.isAllowedHost('localhost:4100', {}),"
+        "p.isAllowedHost('127.0.0.1:4100', {}),"
+        "p.isAllowedHost('localhost', {}),"
+        "p.isAllowedHost('127.0.0.1', {}),"
+        "p.isAllowedHost('[::1]:4100', {}),"
+        "p.isAllowedHost('evil.com', {}),"
+        "p.isAllowedHost('evil.com:4100', {}),"
+        "p.isAllowedHost('', {}),"
+        "p.isAllowedHost('attacker.example:4100', {})"
+        "]"
+    )
+    assert out == [True, True, True, True, True, False, False, False, False]
+
+
+def test_is_allowed_host_honors_configured_host():
+    # An explicitly-configured bind host (e.g. a LAN dev box) is honored via allowedHosts.
+    out = _eval(
+        "["
+        "p.isAllowedHost('devbox.local:4100', {allowedHosts:['devbox.local']}),"
+        "p.isAllowedHost('other.local:4100', {allowedHosts:['devbox.local']})"
+        "]"
+    )
+    assert out == [True, False]
+
+
+def test_token_ok_matches_only_exact_token():
+    # tokenOk: true when header matches the session token, false when missing/wrong/
+    # different-length (constant-time compare guards the length mismatch).
+    out = _eval(
+        "["
+        "p.tokenOk({headers:{'x-atelier-token':'abc123'}}, 'abc123'),"
+        "p.tokenOk({headers:{'x-atelier-token':'wrong0'}}, 'abc123'),"
+        "p.tokenOk({headers:{}}, 'abc123'),"
+        "p.tokenOk({headers:{'x-atelier-token':'abc'}}, 'abc123'),"   # different length
+        "p.tokenOk({headers:{'x-atelier-token':'abc123'}}, '')"       # no server token
+        "]"
+    )
+    assert out == [True, False, False, False, False]
+
+
+def test_build_injection_embeds_token_and_client():
+    # buildInjection embeds window.__atelierToken (when a token is given) plus the client
+    # source and the marker; the default INJECTION (no token) still feeds inject() so the
+    # existing inject tests stay green.
+    node = _node()
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        "const p = require(%r);"
+        "const inj = p.buildInjection('CLIENTBODY', 'tok-XYZ');"
+        "const out = p.inject('<html><body>x</body></html>', p.INJECTION);"
+        "process.stdout.write(JSON.stringify({"
+        "  hasToken: inj.indexOf('window.__atelierToken=\"tok-XYZ\"') !== -1,"
+        "  hasClient: inj.indexOf('CLIENTBODY') !== -1,"
+        "  hasMarker: inj.indexOf('data-atelier-live=\"1\"') !== -1,"
+        "  defaultNoToken: p.INJECTION.indexOf('window.__atelierToken=') === -1,"
+        "  defaultInjectWorks: out.indexOf('data-atelier-live=\"1\"') !== -1"
+        "}));"
+    ) % PROXY
+    r = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["hasToken"] is True
+    assert out["hasClient"] is True
+    assert out["hasMarker"] is True
+    assert out["defaultNoToken"] is True
+    assert out["defaultInjectWorks"] is True
+
+
+def test_control_post_requires_token_then_project_dir():
+    # Token gate runs before project-dir: no token -> 403; correct token but no project-dir
+    # -> still 403 (token gate passes, project-dir gate trips). Drive via makeServer with a
+    # fixed token, sending a loopback Host header so the host guard passes.
+    node = _node()
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        "const p = require(%r);"
+        "const srv = p.makeServer({upstream:'http://127.0.0.1:1', token:'T0KEN'});"  # no projectDir
+        "function probe(headers, cb){"
+        "  let code=0, body='';"
+        "  const req = {url:'/__atelier/accept', method:'POST', headers, on(){}, pipe(){}};"
+        "  const res = {headersSent:false,"
+        "    writeHead(c){code=c; this.headersSent=true;},"
+        "    end(b){ if(b) body+=b; cb(code, body); }};"
+        "  srv.emit('request', req, res);"
+        "}"
+        "let results={};"
+        "probe({host:'localhost:4100'}, (c)=>{results.noToken=c;"        # missing token -> 403
+        "  probe({host:'localhost:4100','x-atelier-token':'T0KEN'}, (c2)=>{results.tokenOkNoDir=c2;"  # token ok, no dir -> 403
+        "    process.stdout.write(JSON.stringify(results));});});"
+    ) % PROXY
+    r = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["noToken"] == 403
+    assert out["tokenOkNoDir"] == 403
+
+
+def test_external_host_rejected_403():
+    # A rebinding-style external Host header is rejected at the very top of the handler,
+    # before any control routing.
+    node = _node()
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        "const p = require(%r);"
+        "const srv = p.makeServer({upstream:'http://127.0.0.1:1', token:'T0KEN'});"
+        "let code=0, body='';"
+        "const req = {url:'/__atelier/accept', method:'POST', headers:{host:'evil.com'}, on(){}, pipe(){}};"
+        "const res = {headersSent:false,"
+        "  writeHead(c){code=c; this.headersSent=true;},"
+        "  end(b){ if(b) body+=b;"
+        "    process.stdout.write(JSON.stringify({code, body}));}};"
+        "srv.emit('request', req, res);"
+    ) % PROXY
+    r = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["code"] == 403
+    assert "host not allowed" in out["body"]
+
+
+def test_control_response_has_no_cors_header():
+    # #3: control responses must NOT carry an access-control-allow-origin header (same-origin
+    # only by design). Capture the headers passed to writeHead for a 403 control response.
+    node = _node()
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        "const p = require(%r);"
+        "const srv = p.makeServer({upstream:'http://127.0.0.1:1', token:'T0KEN'});"
+        "let hdrs={};"
+        "const req = {url:'/__atelier/accept', method:'POST', headers:{host:'localhost:4100'}, on(){}, pipe(){}};"
+        "const res = {headersSent:false,"
+        "  writeHead(c,h){ this.headersSent=true; hdrs=h||{}; },"
+        "  end(b){"
+        "    const keys = Object.keys(hdrs).map(k=>k.toLowerCase());"
+        "    process.stdout.write(JSON.stringify(keys.indexOf('access-control-allow-origin')!==-1));}};"
+        "srv.emit('request', req, res);"
+    ) % PROXY
+    r = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) is False
