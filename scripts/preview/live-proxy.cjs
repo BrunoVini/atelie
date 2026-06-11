@@ -1,0 +1,278 @@
+// atelier live-mode reverse proxy (Phase 7) — Node builtins only.
+//
+// Runs IN FRONT of the user's RUNNING dev server (Vite/Next) and forwards every request
+// to it, injecting the atelier picker client <script> into HTML responses so the user can
+// iterate on their ACTUAL app without changing its config or touching project files
+// (capabilities/live-mode.md). Non-HTML (assets, JSON, HMR) passes through untouched.
+//
+//   node live-proxy.cjs --upstream http://localhost:5173 --port <freeport> \
+//       [--project-dir <repo>] [--journal-dir <dir>] [--inject-only]
+//
+// WebSocket / HMR: Vite & Next push hot updates over a ws upgrade. We tunnel the upgrade
+// transparently (raw socket pipe) so HMR keeps working through the proxy. Tunneling is
+// best-effort; if it fails the injected client degrades (no auto-reattach beyond the
+// MutationObserver) but the PAGE never breaks — documented honestly in live-mode.md.
+//
+// Control endpoints (consumed by the injected client) are served by the proxy under
+// /__atelier and shell the SAME Python the preview server uses (edit_apply.py variants,
+// live_accept.py for the qa-gated accept). --inject-only disables the writing endpoints.
+
+const http = require('http');
+const fs = require('fs');
+const net = require('net');
+const path = require('path');
+const { URL } = require('url');
+const { execFile } = require('child_process');
+
+// ── injection (pure, exported for unit tests) ────────────────────────────────
+const clientPath = path.join(__dirname, 'live-client.js');
+let CLIENT_SRC = '';
+try { CLIENT_SRC = fs.readFileSync(clientPath, 'utf-8'); } catch (_) { CLIENT_SRC = ''; }
+const INJECTION = '\n<script data-atelier-live="1">\n' + CLIENT_SRC + '\n</script>\n';
+
+// Inject the client <script> before </body> (or </html> fallback, or append). Idempotent:
+// if the marker is already present (e.g. a double-proxy), it is NOT injected twice. Pure
+// string transform so the injection logic is unit-tested without a server.
+function inject(html, injection) {
+  const inj = injection != null ? injection : INJECTION;
+  if (typeof html !== 'string') return html;
+  if (html.indexOf('data-atelier-live="1"') !== -1) return html;   // already injected
+  const lower = html.toLowerCase();
+  let idx = lower.lastIndexOf('</body>');
+  if (idx !== -1) return html.slice(0, idx) + inj + html.slice(idx);
+  idx = lower.lastIndexOf('</html>');
+  if (idx !== -1) return html.slice(0, idx) + inj + html.slice(idx);
+  return html + inj;
+}
+
+function isHtml(headers) {
+  const ct = (headers['content-type'] || headers['Content-Type'] || '').toLowerCase();
+  return ct.indexOf('text/html') !== -1;
+}
+
+// Decide whether we may buffer+inject this response. We only inject when the body is
+// HTML AND it is NOT content-encoded (gzip/br/deflate). The proxy strips accept-encoding
+// upstream so stock Vite/Next sends identity and injection works; but if a gzipping
+// caching layer encodes the body, decoding it as utf-8 to inject would CORRUPT it. In
+// that case we pass the body through untouched. Pure predicate, unit-tested.
+function shouldInject(headers) {
+  if (!isHtml(headers)) return false;
+  const enc = (headers['content-encoding'] || headers['Content-Encoding'] || '').toLowerCase().trim();
+  return enc === '' || enc === 'identity';
+}
+
+// ── CLI parsing ──────────────────────────────────────────────────────────────
+function parseArgs(argv) {
+  const out = { injectOnly: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--upstream') out.upstream = argv[++i];
+    else if (a === '--port') out.port = Number(argv[++i]);
+    else if (a === '--host') out.host = argv[++i];
+    else if (a === '--project-dir') out.projectDir = argv[++i];
+    else if (a === '--journal-dir') out.journalDir = argv[++i];
+    else if (a === '--inject-only') out.injectOnly = true;
+  }
+  return out;
+}
+
+// ── control endpoints (shell the same Python the preview server does) ─────────
+function readBody(req, cb) {
+  let body = '';
+  req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+  req.on('end', () => { let p; try { p = JSON.parse(body || '{}'); } catch (_) { p = null; } cb(p); });
+}
+
+function shellPython(scriptArgs, cb, timeout) {
+  execFile('python3', scriptArgs, { timeout: timeout || 120000 }, (err, stdout, stderr) => {
+    const out = (stdout && stdout.trim());
+    if (out) return cb(out);
+    cb(JSON.stringify({ ok: false, reason: (stderr || String(err || 'failed')).trim() }));
+  });
+}
+
+// Is `file` confined within projectDir? Resolves symlinks where the path exists
+// (fs.realpathSync) so a symlink can't escape the project root; falls back to the
+// lexical resolved path for a not-yet-existing file. Returns false if projectDir unset
+// (callers REQUIRE projectDir for writing endpoints and 403 before calling this).
+function isConfined(file, projectDir) {
+  if (!projectDir) return false;
+  const real = (p) => { try { return fs.realpathSync(p); } catch (_) { return path.resolve(p); } };
+  const root = real(path.resolve(projectDir));
+  const target = real(path.resolve(String(file)));
+  return target === root || target.indexOf(root + path.sep) === 0;
+}
+
+function handleControl(req, res, opts) {
+  const scriptsDir = path.resolve(__dirname, '..');
+  const journalDir = opts.journalDir || path.join(require('os').tmpdir(), 'atelier-live', 'journal');
+
+  if (req.url === '/__atelier/variants' && req.method === 'POST') {
+    readBody(req, (p) => {
+      if (!p) { res.writeHead(400); return res.end('{"ok":false,"reason":"bad json"}'); }
+      const mode = String(p.mode || '');
+      if (['range', 'steps', 'toggle'].indexOf(mode) === -1) {
+        res.writeHead(400); return res.end('{"ok":false,"reason":"mode must be range|steps|toggle"}');
+      }
+      const contract = p.contract ? String(p.contract) : (opts.projectDir ? path.resolve(opts.projectDir) : '');
+      if (!contract) { res.writeHead(400); return res.end('{"ok":false,"reason":"no contract — start with --project-dir or pass contract"}'); }
+      const args = [path.join(scriptsDir, 'edit_apply.py'), 'variants', '--mode', mode,
+                    '--contract', contract, '--current', JSON.stringify(p.current || {}), '--n', String(p.n || 3)];
+      if (p.prop) args.push('--prop', String(p.prop));
+      shellPython(args, (out) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(out); }, 15000);
+    });
+    return true;
+  }
+
+  if (req.url === '/__atelier/accept' && req.method === 'POST') {
+    if (opts.injectOnly) { res.writeHead(403); res.end('{"ok":false,"reason":"--inject-only: accept disabled"}'); return true; }
+    // Writing endpoints REQUIRE --project-dir: without a confinement root, an absolute
+    // `file` path could write anywhere. Refuse fail-closed (mirrors /variants 400ing
+    // without a contract).
+    if (!opts.projectDir) { res.writeHead(403); res.end('{"ok":false,"reason":"--project-dir required for accept (writes are confined to it)"}'); return true; }
+    readBody(req, (p) => {
+      if (!p || !p.file || !p.old || !p.qa_target || !p.session) {
+        res.writeHead(400);
+        return res.end('{"ok":false,"reason":"accept needs file, old anchor, qa_target and session (no magic source-mapping)"}');
+      }
+      // Confine writes to the project dir (symlink-resolved), mirroring the preview server.
+      const target = path.resolve(String(p.file));
+      if (!isConfined(target, opts.projectDir)) {
+        res.writeHead(403);
+        return res.end('{"ok":false,"reason":"edits are confined to the project dir"}');
+      }
+      const args = [path.join(scriptsDir, 'live_accept.py'), target,
+                    '--old', String(p.old), '--new', String(p.new || ''),
+                    '--qa-target', String(p.qa_target), '--journal-dir', journalDir,
+                    '--session', String(p.session)];
+      if (p.contract) args.push('--contract', String(p.contract));
+      if (p.register) args.push('--register', String(p.register));
+      if (p.label) args.push('--label', String(p.label));
+      if (p.rationale) args.push('--rationale', String(p.rationale));
+      shellPython(args, (out) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(out); });
+    });
+    return true;
+  }
+
+  if (req.url === '/__atelier/revert' && req.method === 'POST') {
+    if (opts.injectOnly) { res.writeHead(403); res.end('{"ok":false,"reason":"--inject-only: revert disabled"}'); return true; }
+    // revert WRITES to source too (restores from backup), so it also requires --project-dir.
+    if (!opts.projectDir) { res.writeHead(403); res.end('{"ok":false,"reason":"--project-dir required for revert (writes are confined to it)"}'); return true; }
+    readBody(req, (p) => {
+      if (!p || !p.journal_id) { res.writeHead(400); return res.end('{"ok":false,"reason":"journal_id required"}'); }
+      const args = [path.join(scriptsDir, 'edit_apply.py'), 'revert', journalDir, String(p.journal_id)];
+      shellPython(args, (out) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(out); });
+    });
+    return true;
+  }
+  return false;
+}
+
+// ── HTTP proxying with HTML injection ─────────────────────────────────────────
+function proxyRequest(req, res, opts) {
+  const up = new URL(opts.upstream);
+  const headers = Object.assign({}, req.headers);
+  headers.host = up.host;                          // upstream expects its own host header
+  delete headers['accept-encoding'];               // ask upstream for identity so we can inject
+
+  const proxyReq = http.request({
+    host: up.hostname, port: up.port || 80, method: req.method,
+    path: req.url, headers: headers,
+  }, (proxyRes) => {
+    if (shouldInject(proxyRes.headers)) {
+      // Buffer the HTML body, inject, then send. (Dev-server HTML documents are small.)
+      // Only reached for identity-encoded HTML — content-encoded bodies pass through
+      // untouched below so we never corrupt a gzip/br/deflate body by utf-8 decoding it.
+      const chunks = [];
+      proxyRes.on('data', (c) => chunks.push(c));
+      proxyRes.on('end', () => {
+        let html;
+        try { html = Buffer.concat(chunks).toString('utf-8'); } catch (_) { html = ''; }
+        const injected = inject(html);
+        const outHeaders = Object.assign({}, proxyRes.headers);
+        delete outHeaders['content-length'];       // body length changed
+        delete outHeaders['content-encoding'];
+        outHeaders['content-length'] = Buffer.byteLength(injected);
+        res.writeHead(proxyRes.statusCode || 200, outHeaders);
+        res.end(injected);
+      });
+    } else {
+      // Non-HTML OR content-encoded HTML: stream through byte-identical with the
+      // ORIGINAL headers (incl. content-encoding) so a gzip/br/deflate body stays valid.
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
+  });
+
+  proxyReq.on('error', (e) => {
+    if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain' });
+    res.end('atelier live-proxy: upstream unreachable (' + (e && e.message) + ')');
+  });
+
+  req.pipe(proxyReq);
+}
+
+function makeServer(opts) {
+  const server = http.createServer((req, res) => {
+    try {
+      if (req.url && req.url.indexOf('/__atelier') === 0) {
+        if (handleControl(req, res, opts)) return;
+        res.writeHead(404); res.end('{"ok":false,"reason":"unknown control route"}'); return;
+      }
+      proxyRequest(req, res, opts);
+    } catch (e) {
+      if (!res.headersSent) res.writeHead(500);
+      res.end('atelier live-proxy error: ' + (e && e.message));
+    }
+  });
+
+  // Transparent WebSocket/HMR tunnel: pipe the raw upgrade socket to the upstream.
+  // Best-effort — on any failure we tear down our side without crashing the proxy, and
+  // the injected client degrades gracefully (live-mode.md documents the limitation).
+  server.on('upgrade', (req, clientSocket, head) => {
+    try {
+      const up = new URL(opts.upstream);
+      const upstreamSocket = net.connect(up.port || 80, up.hostname, () => {
+        // Re-send the upgrade request line + headers to the upstream verbatim.
+        let raw = req.method + ' ' + req.url + ' HTTP/1.1\r\n';
+        for (let i = 0; i < req.rawHeaders.length; i += 2) {
+          raw += req.rawHeaders[i] + ': ' + req.rawHeaders[i + 1] + '\r\n';
+        }
+        raw += '\r\n';
+        upstreamSocket.write(raw);
+        if (head && head.length) upstreamSocket.write(head);
+        upstreamSocket.pipe(clientSocket);
+        clientSocket.pipe(upstreamSocket);
+      });
+      const kill = () => { try { upstreamSocket.destroy(); } catch (_) {} try { clientSocket.destroy(); } catch (_) {} };
+      upstreamSocket.on('error', kill);
+      clientSocket.on('error', kill);
+    } catch (_) {
+      try { clientSocket.destroy(); } catch (_) {}
+    }
+  });
+
+  return server;
+}
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  if (!opts.upstream) {
+    console.error('usage: node live-proxy.cjs --upstream http://localhost:5173 --port <freeport> [--project-dir <repo>] [--journal-dir <dir>] [--inject-only]');
+    process.exit(2);
+  }
+  const port = opts.port || (49152 + Math.floor(Math.random() * 16383));
+  const host = opts.host || '127.0.0.1';
+  const server = makeServer(opts);
+  server.listen(port, host, () => {
+    console.log(JSON.stringify({
+      type: 'live-proxy-started', port: port, host: host,
+      url: 'http://' + (host === '127.0.0.1' ? 'localhost' : host) + ':' + port,
+      upstream: opts.upstream, inject_only: !!opts.injectOnly,
+    }));
+  });
+}
+
+if (require.main === module) main();
+
+module.exports = { inject, isHtml, shouldInject, isConfined, parseArgs, makeServer, INJECTION };

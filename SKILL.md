@@ -110,6 +110,7 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | A settings / account / form / sign-up / onboarding / wizard / admin / app utility surface | `references/capabilities/forms-craft.md` | `slop_check.py` |
 | A live preview / demo / "show me" / pick between options | `references/capabilities/preview.md` | `scripts/preview/start.sh` |
 | Iterate live on an element (pick → contract-bound variants → accept into source) | `references/capabilities/preview.md` | `scripts/edit_apply.py` |
+| Live mode on the user's RUNNING app — "iterate on my running app", "tweak my Vite/Next app", "live preview of my dev server" ("modo ao vivo", "iterar no meu app rodando", "ajustar meu app Vite/Next") | `references/capabilities/live-mode.md` | `scripts/live_detect.py`, `scripts/preview/live-proxy.cjs`, `scripts/live_accept.py` |
 | Refine an existing artifact with a named move — bolder/quieter, simplify/distill, harden edge-cases, polish, one delight moment ("make it pop", "tone it down", "deixa mais forte", "suaviza", "estados vazios") | `references/capabilities/refine.md` | `scripts/edit_apply.py`, `seed_content.py` |
 | 2-3 design directions to choose from | `references/capabilities/variants.md` | `assets/engines/canvas.jsx` |
 | A hard call / "weigh the options" / decide a direction | `references/capabilities/council.md` | (5-agent council) |
