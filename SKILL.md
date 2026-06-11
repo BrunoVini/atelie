@@ -140,6 +140,28 @@ Three phases: **MEASURE** the repo → **GENERATE** artifacts → **GOVERN** coh
 | Avoid shipping the same look every cold-start project (anti-sameness) | `references/workflows/generate-design-md.md` | `cold_start_ledger.py` |
 | Onboard the team to the design language | `references/workflows/onboarding.md` | `build_onboarding.py` |
 
+## Register — brand vs product (resolve it before you GENERATE or GOVERN)
+
+Every surface answers to one of two registers, and they pull in opposite directions.
+**brand** = the design IS the product (landing, marketing, portfolio, campaign); the
+bar is distinctiveness and the failure is generic/safe output. **product** = the design
+SERVES the product (app UI, dashboard, admin, settings, tools); the bar is earned
+familiarity/clarity and the failure is decoration that costs usability. Read
+`references/registers/brand.md` and `references/registers/product.md`.
+
+Resolve the active register by **first match wins**:
+
+1. **Explicit task cue** — "landing page", "marketing", "portfolio", "campaign" → brand;
+   "dashboard", "admin", "settings", "internal tool" → product.
+2. **The surface in focus** — the page, route, or file being worked on.
+3. **The `register` field** in `DESIGN.md` (the machine-readable half — see design-md-spec.md).
+4. **Fallback** — infer from the product type; when it stays ambiguous, treat it as
+   **product** (familiarity is the safer default; brand is opt-in).
+
+The register modulates QA severity (`qa.py`/`slop_check.py --register`): it escalates
+findings that already exist, never invents new ones. With no register resolved, behavior
+is unchanged.
+
 ## Definition of done — self-QA every artifact (this is the delta)
 
 Any capable model can *generate* a page. What it cannot do is mechanically verify its

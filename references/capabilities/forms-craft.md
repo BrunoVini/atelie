@@ -6,6 +6,8 @@ These are *jobs the user came to finish*, not posters they came to admire. Read 
 the deliverable is something a user operates rather than reads. Pair it with the universal QA
 gates (focus-visible, honest working controls, anti-slop) — those apply here too.
 
+This is a **product**-register surface (the design SERVES the product); see `references/registers/product.md` for the clarity bar and how QA escalates decorative-cost tells here.
+
 The one-line thesis: **a utility surface is judged by how little it makes the user think,
 not by how much design it shows.** The senior move is editing *out*, not adding flourish.
 

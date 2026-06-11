@@ -6,6 +6,8 @@ dashboard that an analyst trusts and one that quietly lies. Read it whenever you
 dashboard, KPI row, chart, funnel, cohort, or data table. Pair it with the universal QA
 gates (focus-visible, honest working controls, anti-slop) — those apply here too.
 
+This is a **product**-register surface (the design SERVES the product); see `references/registers/product.md` for the clarity bar and how QA escalates decorative-cost tells here.
+
 ## 1. Data integrity — a dashboard that's internally inconsistent is worse than none
 
 An analyst reads these numbers literally. Any silent gap reads as "there is no value there."

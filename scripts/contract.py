@@ -101,6 +101,9 @@ def _contract_from_block(block, path):
         "fonts": list(fonts) if isinstance(fonts, list) else [],
         "spacing": [str(s) for s in spacing] if isinstance(spacing, list) else [],
         "depth": block.get("depth") if isinstance(block.get("depth"), str) else None,
+        # register: which guidance set this surface answers to (brand vs product).
+        # Default None when absent; validate_contract flags an out-of-vocab value.
+        "register": block.get("register"),
     }
     if dark:
         out["dark_colors"] = dark
@@ -234,6 +237,9 @@ def unresolved_references(design_text, contract):
     return bad
 
 
+ALLOWED_REGISTERS = ("brand", "product")
+
+
 def validate_contract(contract):
     """B2: report what parsed and whether it's viable to ENFORCE, instead of silently
     degrading lint to noise/silence on a contract that barely parsed. Returns
@@ -241,6 +247,10 @@ def validate_contract(contract):
     colors = contract.get("colors", {})
     fonts = contract.get("fonts", [])
     issues = []
+    register = contract.get("register")
+    if register is not None and register not in ALLOWED_REGISTERS:
+        issues.append(f"register {register!r} is not one of {ALLOWED_REGISTERS} — "
+                      "use \"brand\" or \"product\", or omit the key")
     if contract.get("machine_block") in ("unparseable", "not-an-object"):
         issues.append("an atelier-contract block is present but unparseable — fell back to prose; "
                       "fix the JSON so the block is authoritative")
@@ -256,7 +266,8 @@ def validate_contract(contract):
         "source": contract.get("source"),
         "colors": len(colors), "fonts": len(fonts), "spacing": len(contract.get("spacing", [])),
         "dark_colors": len(contract.get("dark_colors") or {}),
-        "depth": contract.get("depth"), "issues": issues, "ok": not issues,
+        "depth": contract.get("depth"), "register": register,
+        "issues": issues, "ok": not issues,
     }
     return (not issues), report
 

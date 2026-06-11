@@ -20,7 +20,12 @@ given generator: `--profile codex` (huge radii, sketchy SVG, stripe gradients),
 
 Usage:
     python3 slop_check.py <page.html> [--contract <repo|tokens.json>]
-                          [--profile codex|gemini] [--json]
+                          [--profile codex|gemini] [--register brand|product] [--json]
+
+`--register` (or a `register` field in the contract) MODULATES severity: in a
+product surface the decorative-cost tells (glassmorphism, oversized hero, dark
+glow) gate; in a brand surface the too-safe tells (generic/overused/single font,
+flat hierarchy, monotonous spacing) gate. With no register, behavior is unchanged.
 """
 import json
 import re
@@ -415,7 +420,47 @@ def _profile_tells(html, profile):
     return findings
 
 
-def check_html(html, allowed_fonts=None, profile=None, contract=None):
+# Register-aware severity escalation. The register MODULATES the severity of findings
+# that already exist; it never invents detectors. Keyed by finding `kind` so it's
+# auditable and stays in sync with references/registers/{brand,product}.md and
+# design-laws.md. With register=None this map is never consulted, so default behavior
+# (and every existing test) is byte-identical.
+#   product: decorative-cost tells gate — in a tool they buy a look at the cost of clarity.
+#   brand:   "too-safe" tells gate — a brand surface that reads generic has failed its one job.
+# (generic-font is already "important"; listing it keeps the brand intent explicit and
+#  auditable — escalating an already-gating finding is a no-op.)
+_REGISTER_ESCALATION = {
+    "product": {
+        "glassmorphism": "important",
+        "oversized-h1": "important",
+        "dark-glow": "important",
+    },
+    "brand": {
+        "generic-font": "important",
+        "overused-font": "important",
+        "single-font": "important",
+        "flat-type-hierarchy": "important",
+        "monotonous-spacing": "important",
+    },
+}
+
+
+def apply_register(findings, register):
+    """Post-process pass: escalate the severity of existing findings per the active
+    register. No register -> findings returned unchanged (exact default behavior).
+    Preserves the {severity, kind, detail, ...} shape; only `severity` is rewritten.
+    Mutates `findings` in place and returns the same list (not a copy)."""
+    escalation = _REGISTER_ESCALATION.get(register)
+    if not escalation:
+        return findings
+    for f in findings:
+        new_sev = escalation.get(f.get("kind"))
+        if new_sev:
+            f["severity"] = new_sev
+    return findings
+
+
+def check_html(html, allowed_fonts=None, profile=None, contract=None, register=None):
     allowed = {f.lower() for f in (allowed_fonts or [])}
     findings = []
 
@@ -475,14 +520,19 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
     findings.extend(_dead_anchor_tells(html))
     findings.extend(ported_tells(html, allowed))    # impeccable-ported static rules
     findings.extend(_profile_tells(html, profile))
-    return findings
+
+    # Register-aware severity (post-pass, keyed by kind). An explicit `register`
+    # wins; otherwise fall back to the contract's `register` field. None -> no-op.
+    if register is None and isinstance(contract, dict):
+        register = contract.get("register")
+    return apply_register(findings, register)
 
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a]
     if not args or args[0].startswith("-"):
         print("usage: slop_check.py <page.html> [--contract <repo|tokens.json>] "
-              "[--profile codex|gemini] [--json]")
+              "[--profile codex|gemini] [--register brand|product] [--json]")
         sys.exit(2)
     html = open(args[0], encoding="utf-8").read()
     allowed, contract = [], None
@@ -499,7 +549,13 @@ if __name__ == "__main__":
             profile = args[args.index("--profile") + 1]
         except IndexError:
             pass
-    findings = check_html(html, allowed, profile=profile, contract=contract)
+    register = None
+    if "--register" in args:
+        try:
+            register = args[args.index("--register") + 1]
+        except IndexError:
+            pass
+    findings = check_html(html, allowed, profile=profile, contract=contract, register=register)
     if "--json" in args:
         print(json.dumps(findings, indent=2))
     else:

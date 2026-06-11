@@ -6,6 +6,8 @@ Anti-slop keeps a page from looking generated; **craft** is what makes it look
 off on scroll, and a CTA that leads the eye. Read this whenever you generate a hero,
 landing, or marketing surface. Each rule below is a gate: if you can't say "yes", fix it.
 
+This is a **brand**-register surface (the design IS the product); see `references/registers/brand.md` for the distinctiveness bar and how QA escalates the too-safe tells here.
+
 ## 1. The hero needs a focal moment with depth — not one flat pane
 
 A single rectangular "product screenshot" pane is the template default. A designed hero

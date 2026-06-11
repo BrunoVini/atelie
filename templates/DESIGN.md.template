@@ -38,13 +38,21 @@
   },
   "fonts": ["{{FONT_DISPLAY}}", "{{FONT_BODY}}"],
   "spacing": [{{SPACING_SCALE_JSON}}],
-  "depth": "{{DEPTH_STRATEGY}}"
+  "depth": "{{DEPTH_STRATEGY}}",
+  "register": "{{REGISTER}}"
 }
 ```
+<!-- `register`: "brand" (design IS the product — landing/marketing/portfolio) or
+     "product" (design SERVES the product — app UI/dashboard/settings/tools). It
+     modulates QA severity for this surface (see references/registers/). When ambiguous,
+     "product" is the safer default; brand is opt-in. Delete the key to leave it unset. -->
+
 
 ## 1. Identity & tone
 - **Product type:** {{PRODUCT_TYPE}}
 - **Audience:** {{AUDIENCE}}
+- **Register:** {{REGISTER}}  <!-- brand (design IS the product) | product (design SERVES it); matches the machine block -->
+- **Anti-references:** {{ANTI_REFERENCES}}  <!-- the looks to avoid, so generation pushes past the category default -->
 - **Tone (committed):** {{TONE}}  <!-- one bold, intentional direction -->
 
 ## 2. Palette

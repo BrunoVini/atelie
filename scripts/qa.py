@@ -7,7 +7,10 @@ hard to skip or argue with. A check that crashed or found no browser is reported
 
 Usage:
     python3 qa.py <artifact.html | repo-dir> [--contract <repo|tokens.json>]
-                  [--widths 390,768,834,1024,1440] [--hook] [--json]
+                  [--widths 390,768,834,1024,1440] [--register brand|product] [--hook] [--json]
+
+`--register` overrides the contract's own `register` field and modulates slop
+severity for the active register (see slop_check.py / references/registers/).
 """
 import json
 import os
@@ -38,7 +41,7 @@ def hook_exit_code(results):
     return 0
 
 
-def _slop(html, contract=None, profile=None):
+def _slop(html, contract=None, profile=None, register=None):
     from slop_check import check_html
     resolved, allowed = None, []
     if contract:                       # contract is a path (repo|tokens.json); resolve it to a dict
@@ -48,7 +51,10 @@ def _slop(html, contract=None, profile=None):
             allowed = resolved.get("fonts", [])
         except Exception:
             resolved = None
-    findings = check_html(html, allowed_fonts=allowed, profile=profile, contract=resolved)
+    # Active register: an explicit --register flag overrides; else the contract's
+    # `register` field (resolved inside check_html). None = today's exact behavior.
+    findings = check_html(html, allowed_fonts=allowed, profile=profile,
+                          contract=resolved, register=register)
     important = [f for f in findings if f["severity"] == "important"]
     advisory = [f for f in findings if f["severity"] != "important"]
     return CheckResult(
@@ -206,7 +212,7 @@ def _static(repo, contract):
     return out
 
 
-def _battery(target, contract, widths, hook, kind=None):
+def _battery(target, contract, widths, hook, kind=None, register=None):
     """Build the result list for a target (artifact file or repo dir)."""
     results = []
     is_html = os.path.isfile(target) and target.endswith(".html")
@@ -224,7 +230,7 @@ def _battery(target, contract, widths, hook, kind=None):
         results += rendered
         # Anti-slop binds in the self-QA loop too (important findings gate the --hook), not
         # only in full mode — a fabricated logo wall or missing focus ring should block "done".
-        results.append(_slop(html, contract=contract))
+        results.append(_slop(html, contract=contract, register=register))
         if not hook:                                  # full-mode-only layer (needs a contract)
             if contract:
                 results.append(_contrast(contract=contract))
@@ -241,14 +247,15 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a]
     if not args:
         print("usage: qa.py <artifact.html|repo-dir> [--contract <repo|tokens.json>] "
-              "[--widths a,b,c] [--kind page|animation] [--hook] [--json]")
+              "[--widths a,b,c] [--kind page|animation] [--register brand|product] [--hook] [--json]")
         sys.exit(2)
     target = args[0]
     contract = args[args.index("--contract") + 1] if "--contract" in args else None
     widths = args[args.index("--widths") + 1] if "--widths" in args else DEFAULT_WIDTHS
     kind = args[args.index("--kind") + 1] if "--kind" in args else None   # page|animation (else auto)
+    register = args[args.index("--register") + 1] if "--register" in args else None   # overrides the contract's
     hook = "--hook" in args
-    results = _battery(target, contract, widths, hook, kind=kind)
+    results = _battery(target, contract, widths, hook, kind=kind, register=register)
     if "--json" in args:
         print(json.dumps([r._asdict() for r in results], indent=2))
     else:

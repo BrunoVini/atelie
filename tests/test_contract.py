@@ -57,6 +57,7 @@ def test_template_machine_block_is_valid_json(tmp_path):
         "{{DARK_DESTRUCTIVE}}": "#f87171", "{{DARK_ON_DESTRUCTIVE}}": "#0b0e12",
         "{{FONT_DISPLAY}}": "Sora", "{{FONT_BODY}}": "Inter",
         "{{SPACING_SCALE_JSON}}": '"4px", "8px", "16px", "24px"', "{{DEPTH_STRATEGY}}": "borders-only",
+        "{{REGISTER}}": "product",
     }
     for k, v in fills.items():
         text = text.replace(k, v)
@@ -64,6 +65,7 @@ def test_template_machine_block_is_valid_json(tmp_path):
     d.write_text(text)
     c = resolve_contract(str(d))
     assert c.get("machine_block") is None and not c.get("machine_block_dropped")
+    assert c["register"] == "product"   # the optional register key parses from the block
     # the template ships a co-equal dark palette in the block, so dark tokens enforce too
     assert c["dark_colors"]["background"] == "#0b0e12" and c["dark_colors"]["foreground"] == "#f7f7f8"
     # the block must carry ALL the §2 palette roles (not just primary), so lint/audit
@@ -158,6 +160,54 @@ def test_dark_palette_resolves_end_to_end_from_design_md(tmp_path):
         "```\n")
     c = resolve_contract(str(d))
     assert c["dark_colors"]["foreground"] == "#f7f7f8"
+
+
+# --- register field (Phase 2) ------------------------------------------------
+# An optional "register" key states whether a surface is brand or product. It must
+# parse into the contract (default None when absent) and validate loudly when present
+# but out of vocabulary.
+
+def test_register_parses_from_block():
+    from contract import _contract_from_block
+    c = _contract_from_block(
+        {"colors": {"ink": "#111111"}, "fonts": ["Sora"], "register": "brand"}, "x")
+    assert c["register"] == "brand"
+
+
+def test_register_absent_defaults_to_none():
+    from contract import _contract_from_block
+    c = _contract_from_block({"colors": {"ink": "#111111"}, "fonts": ["Sora"]}, "x")
+    assert c["register"] is None
+
+
+def test_validate_passes_valid_register():
+    ok, rep = validate_contract({"source": "x", "colors": {"ink": "#111111", "paper": "#ffffff"},
+                                 "fonts": ["Sora"], "register": "product"})
+    assert ok is True and not rep["issues"] and rep["register"] == "product"
+
+
+def test_validate_fails_loudly_on_bad_register():
+    ok, rep = validate_contract({"source": "x", "colors": {"ink": "#111111", "paper": "#ffffff"},
+                                 "fonts": ["Sora"], "register": "marketing"})
+    assert ok is False and any("register" in i for i in rep["issues"])
+
+
+def test_validate_no_register_is_clean():
+    # absent register -> no issue, behaves exactly as before
+    ok, rep = validate_contract({"source": "x", "colors": {"ink": "#111111", "paper": "#ffffff"},
+                                 "fonts": ["Sora"]})
+    assert ok is True and rep["register"] is None
+
+
+def test_register_resolves_end_to_end_from_design_md(tmp_path):
+    d = tmp_path / "DESIGN.md"
+    d.write_text(
+        "```json atelier-contract\n"
+        '{"colors":{"background":"#ffffff","foreground":"#111111"},'
+        '"fonts":["Sora"],"register":"brand"}\n'
+        "```\n")
+    c = resolve_contract(str(d))
+    assert c["register"] == "brand"
 
 
 def test_template_has_agent_prompt_guide():

@@ -14,6 +14,15 @@ a strategy string. Keep the block and prose in sync; `contract.py --validate <re
 loudly if the block is malformed (it would otherwise silently fall back to prose). Non-hex
 color values (e.g. `oklch(...)`) aren't yet supported in the block — keep colors as hex.
 
+An optional `"register"` key states which guidance set this surface answers to:
+`"brand"` (the design IS the product — landing, marketing, portfolio) or `"product"`
+(the design SERVES the product — app UI, dashboard, settings, tools). It is the
+machine-readable half of the "Product context" prose below; `contract.py` parses it
+(default `None` when absent) and `contract.py --validate` fails loudly if it is present
+but not one of the two allowed values. The register modulates QA severity (it escalates
+existing findings, never invents new ones — see `references/registers/`); omit it to keep
+default behavior. See SKILL.md for how the active register is resolved (first match wins).
+
 **Dark theme (co-equal, machine-enforced).** A light+dark system carries its DARK palette
 in an optional `"dark"` key — a second `{role: "#hex"}` map (same roles as `colors`).
 `contract.py` parses it into `dark_colors`, and `audit_contrast.py` audits BOTH themes, so
@@ -24,7 +33,8 @@ dark tokens are documentation, not contract. Omit the `dark` key for a light-onl
 {
   "colors": { "background": "#ffffff", "foreground": "#111111", "primary": "#2563eb", "on-primary": "#ffffff" },
   "dark":   { "background": "#0b0e12", "foreground": "#f7f7f8", "primary": "#60a5fa", "on-primary": "#0b0e12" },
-  "fonts": ["Sora", "Inter"], "spacing": ["4px", "8px", "16px"], "depth": "surface-shift"
+  "fonts": ["Sora", "Inter"], "spacing": ["4px", "8px", "16px"], "depth": "surface-shift",
+  "register": "product"
 }
 ```
 
@@ -70,6 +80,21 @@ dark tokens are documentation, not contract. Omit the `dark` key for a light-onl
     + ready-to-paste section prompts) so any coding agent, not just atelier, can build
     on-contract without reading the whole file. Synthesize from the tokens; point at §6
     for anti-slop rules rather than hardcoding bans.
+
+## Product context (what §1's prose should capture)
+
+atelier is single-contract: there is no separate `PRODUCT.md`. The product context
+lives inside §1 (Identity & tone) as prose, and `register` is its machine-readable
+half. When writing §1, capture:
+
+- **Audience** — who operates or reads this, and what they came to do.
+- **Anti-references** — the looks to avoid ("not another SaaS-cream landing", "not a
+  navy-and-gold fintech"), so generation pushes past the category's default reflex.
+- **Register** — `brand` or `product` (see the machine block above and
+  `references/registers/`); this is the one field that is also machine-readable.
+- **Committed tone** — the ONE bold, intentional direction (design-philosophy §1).
+
+Keep it to a few sentences; it steers GENERATE without bloating the contract.
 
 ## Scale the contract to the repo
 
