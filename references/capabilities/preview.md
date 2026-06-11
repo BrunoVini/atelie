@@ -183,9 +183,10 @@ POST /variants   { "mode": "range"|"steps"|"toggle", "prop": "<css-prop>",
 the variants are bound to the repo's own contract. **Every variant the endpoint returns
 is already proven on-contract** by the engine's `variants_are_on_contract` guard — an
 off-contract value is a bug, never something the user is offered. `range` slides one
-property across its contract scale (needs the scale to exist — a `tokens.json` without a
-`radius` scale yields `[]` for `--prop border-radius`, which is correct, not an error);
-`steps` is the discrete named set; `toggle` flips one property on/off.
+property across its contract scale, so it works when the contract declares that scale
+(`radius` for `border-radius`, `spacing` for `padding`/`gap`); it returns `[]` only when
+that specific scale is absent. `steps` is the discrete named set; `toggle` flips one
+property on/off (`box-shadow` uses the contract's `elevation` when declared).
 
 The browser client wires this into `window.atelier`:
 

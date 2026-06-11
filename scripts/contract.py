@@ -7,7 +7,8 @@ many real repos) — only in the prose `DESIGN.md`. This resolves either, so
 governance follows the contract instead of dying when there's no `design/` folder.
 
 resolve_contract(target) accepts a tokens.json path, a repo dir, or a DESIGN.md
-path and returns: {"source", "colors": {name: "#hex"}, "fonts": [..], "spacing": [..]}.
+path and returns: {"source", "colors": {name: "#hex"}, "fonts": [..], "spacing": [..],
+"radius": [..], "depth", and optionally "elevation"}.
 """
 import json
 import os
@@ -53,11 +54,21 @@ def _from_tokens_json(path):
     for v in vals("font", "fonts", "fontFamily").values():
         fonts.extend(v if isinstance(v, list) else [v])
     spacing = [str(v) for v in vals("space", "spaces", "spacing").values()]
+    radius = [str(v) for v in vals("radius", "radii").values()]
     depth = data.get("depth")
     if not depth:
         depth = (data.get("$extensions", {}) or {}).get("atelier", {}).get("depth")
-    return {"source": path, "colors": colors, "fonts": fonts, "spacing": spacing,
-            "depth": depth if isinstance(depth, str) else None}
+    # elevation: a single committed box-shadow the toggle can use. Source from a
+    # shadow/elevation token group (first value) when present; else None (the engine
+    # falls back safely). Don't fabricate a shadow ramp — one honest value or nothing.
+    shadows = [str(v) for v in vals("shadow", "shadows", "elevation").values()]
+    elevation = shadows[0] if shadows else None
+    out = {"source": path, "colors": colors, "fonts": fonts, "spacing": spacing,
+           "radius": radius,
+           "depth": depth if isinstance(depth, str) else None}
+    if elevation is not None:
+        out["elevation"] = elevation
+    return out
 
 
 # B1: the canonical machine block — the contract embedded as fenced JSON. Parsed FIRST,
@@ -95,16 +106,32 @@ def _contract_from_block(block, path):
     dark, dark_dropped = _hexmap(raw_dark, "dark:")
     fonts = block.get("fonts")
     spacing = block.get("spacing")
+    radius = block.get("radius")
     out = {
         "source": path,
         "colors": colors,
         "fonts": list(fonts) if isinstance(fonts, list) else [],
         "spacing": [str(s) for s in spacing] if isinstance(spacing, list) else [],
+        # radius scale (mirrors spacing): the canonical contract block already shows a
+        # `radius` field (design-md-spec.md). Without it, the range engine's
+        # border-radius mode has no scale to slide and returns [] against real contracts.
+        "radius": [str(r) for r in radius] if isinstance(radius, list) else [],
         "depth": block.get("depth") if isinstance(block.get("depth"), str) else None,
         # register: which guidance set this surface answers to (brand vs product).
         # Default None when absent; validate_contract flags an out-of-vocab value.
         "register": block.get("register"),
     }
+    # elevation: a single committed box-shadow string the toggle can use. Accept a
+    # bare string `elevation`/`shadow`, or the first value of a {name: shadow} map.
+    # Absent = None and the engine falls back to its restrained default.
+    elev = block.get("elevation")
+    if elev is None:
+        elev = block.get("shadow")
+    if isinstance(elev, dict):
+        vals_e = [str(v) for v in elev.values() if isinstance(v, str)]
+        elev = vals_e[0] if vals_e else None
+    if isinstance(elev, str):
+        out["elevation"] = elev
     if dark:
         out["dark_colors"] = dark
     if dropped or dark_dropped:
@@ -185,7 +212,11 @@ def _from_design_md_prose(text, path):
                 fonts.append(fm)
     mdep = re.search(r"depth strategy[^\n:=]*[:=]\s*\**\s*`?([a-z][a-z-]+)`?", text, re.I)
     depth = mdep.group(1).lower() if mdep else None
-    return {"source": path, "colors": colors, "fonts": fonts, "spacing": [], "depth": depth}
+    # radius: no cheap prose signal worth the parsing risk -> default []; the range
+    # engine returns [] gracefully (border-radius mode just isn't offered for a
+    # prose-only contract). elevation likewise absent (engine falls back).
+    return {"source": path, "colors": colors, "fonts": fonts, "spacing": [],
+            "radius": [], "depth": depth}
 
 
 def resolve_contract(target):

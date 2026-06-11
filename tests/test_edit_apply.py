@@ -92,6 +92,87 @@ def test_propose_variants_signature_and_behavior_unchanged():
     assert ea.variants_are_on_contract(out, CONTRACT) == []
 
 
+# ── Part 2b: the engine against a REAL resolved contract (not a hand-built dict) ──
+# Phase 5 added range/toggle reading contract["radius"]/["elevation"], but the
+# resolvers never emitted those keys, so range --prop border-radius returned [] and
+# the box-shadow toggle always used the hardcoded fallback against every real project.
+# This drives resolve_contract output, so it would FAIL before the radius/elevation
+# resolver fix and PASS after.
+
+def test_engine_works_against_a_resolved_tokens_json_contract(tmp_path):
+    import contract as ct
+    tok = tmp_path / "design" / "design-tokens.json"
+    tok.parent.mkdir(parents=True)
+    tok.write_text(json.dumps({
+        "color":  {"ink": "#111111", "paper": "#ffffff", "accent": "#cc2222"},
+        "font":   {"display": "Sora"},
+        "space":  {"1": "4px", "2": "8px", "3": "16px"},
+        "radius": {"sm": "4px", "md": "8px", "lg": "16px"},
+        "shadow": {"1": "0 4px 12px rgba(0,0,0,0.12)"},
+    }), encoding="utf-8")
+
+    resolved = ct.resolve_contract(str(tok))
+    # The resolved contract now carries the new keys the engine reads.
+    assert resolved["radius"] == ["4px", "8px", "16px"]
+    assert resolved.get("elevation") == "0 4px 12px rgba(0,0,0,0.12)"
+
+    # range over border-radius now produces NON-EMPTY, on-contract variants.
+    rng = ea.build_variants({"border-radius": "8px"}, resolved, "range",
+                            prop="border-radius", n=3)
+    assert rng, "range over a declared radius scale must be non-empty"
+    radii = {v["styles"]["border-radius"] for v in rng}
+    assert radii <= set(resolved["radius"])
+    assert ea.variants_are_on_contract(rng, resolved) == []
+
+    # toggle box-shadow off→on uses the CONTRACT elevation, not the hardcoded fallback.
+    tog = ea.build_variants({"box-shadow": "none"}, resolved, "toggle", prop="box-shadow")
+    states = {v["label"]: v["styles"]["box-shadow"] for v in tog}
+    assert states["box-shadow: off"] == "none"
+    assert states["box-shadow: on"] == "0 4px 12px rgba(0,0,0,0.12)"
+    assert states["box-shadow: on"] != "0 1px 2px rgba(0,0,0,0.08)"  # not the fallback
+
+
+def test_engine_works_against_a_resolved_atelier_contract_block(tmp_path):
+    import contract as ct
+    d = tmp_path / "DESIGN.md"
+    d.write_text(
+        "```json atelier-contract\n"
+        '{"colors":{"ink":"#111111","paper":"#ffffff"},"fonts":["Sora"],'
+        '"spacing":["4px","8px"],"radius":["4px","8px","16px"],'
+        '"elevation":"0 2px 8px rgba(0,0,0,0.1)","depth":"surface-shift"}\n'
+        "```\n", encoding="utf-8")
+    resolved = ct.resolve_contract(str(d))
+    assert resolved["radius"] == ["4px", "8px", "16px"]
+    assert resolved["elevation"] == "0 2px 8px rgba(0,0,0,0.1)"
+
+    rng = ea.build_variants({"border-radius": "4px"}, resolved, "range",
+                            prop="border-radius", n=3)
+    assert rng and ea.variants_are_on_contract(rng, resolved) == []
+
+    tog = ea.build_variants({"box-shadow": "none"}, resolved, "toggle", prop="box-shadow")
+    on = next(v for v in tog if v["label"] == "box-shadow: on")
+    assert on["styles"]["box-shadow"] == "0 2px 8px rgba(0,0,0,0.1)"
+
+
+def test_resolved_contract_without_radius_resolves_and_range_is_empty(tmp_path):
+    # No radius/shadow declared -> radius=[], no elevation key, engine returns []
+    # gracefully (no regression). validate_contract must not choke on the new shape.
+    import contract as ct
+    tok = tmp_path / "design" / "design-tokens.json"
+    tok.parent.mkdir(parents=True)
+    tok.write_text(json.dumps({
+        "color": {"ink": "#111111", "paper": "#ffffff"},
+        "font":  {"display": "Sora"},
+        "space": {"1": "4px", "2": "8px"},
+    }), encoding="utf-8")
+    resolved = ct.resolve_contract(str(tok))
+    assert resolved["radius"] == [] and "elevation" not in resolved
+    assert ea.build_variants({"border-radius": "8px"}, resolved, "range",
+                             prop="border-radius") == []
+    ok, _ = ct.validate_contract(resolved)
+    assert ok is True  # two colors + a font -> still viable, unaffected by the new keys
+
+
 # ── Part 3: session journaling ───────────────────────────────────────────────
 
 def _src(tmp_path, name="page.html", text="<div class='card'>hello</div>\n"):
