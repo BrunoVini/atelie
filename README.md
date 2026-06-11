@@ -30,6 +30,40 @@ pages, components, slides, animations, previews, variants, reviews, layout score
 (no install needed); `screenshot.mjs` / `diff_screens.mjs` / `responsive_check.mjs`
 and video export are optional and need Node + a headless browser.
 
+### Standalone CLI — `atelier check`
+
+You don't need the Claude Code skill to run atelier's deterministic design gate.
+The `check` command ships as a tiny, **stdlib-only** CLI (zero runtime
+dependencies) you can drop into any repo's CI or pre-commit:
+
+```bash
+# from a clone, no install (ephemeral):
+uvx --from . atelier check path/to/your-repo
+
+# install it on PATH:
+pipx install .          # then:  atelier check path/to/your-repo
+
+# no install at all — straight from the source tree:
+python3 -m atelier check path/to/your-repo
+```
+
+`atelier check <path>` runs the same four deterministic gates the skill uses as a
+merge gate, against a **local repo directory**:
+
+- **design-lint** — colors / fonts / spacing / elevation that drift off the contract
+- **contrast-audit** — WCAG AA contrast on the contract's color pairs
+- **house-rules** — `DESIGN.md` §9 "do/don't" rules (e.g. "no flyouts, only modals")
+- **overlap-risk** — static collision patterns (%-pinned absolutes, negative margins, …)
+
+It needs a contract in the target: `design/design-tokens.json` **or** a `DESIGN.md`.
+Exit codes: `0` pass, `1` gate failed, `2` usage / no-contract / missing path.
+Forwarded flags: `--contract <json>`, `--max-drift N`, `--allow-contrast-fail`,
+`--max-overlap-risk N`, `--ratchet`, `--update-baseline`. The command operates on
+local paths only — it does **not** fetch URLs.
+
+The PyPI distribution name is `atelier-design`; the import package and the command
+are both `atelier`, so it's `atelier check …` either way.
+
 ## Gallery
 
 Same brief, same model — **without atelier vs. with it.** The skill drops the generic-AI

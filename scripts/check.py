@@ -58,12 +58,19 @@ def run(repo, contract, max_drift=0, allow_contrast_fail=False, max_overlap_risk
     return results
 
 
-if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a]
+def main(argv=None):
+    """CLI entry: parse argv, run the gate, print results, return an exit code.
+
+    Shared by ``python3 scripts/check.py`` and the standalone ``atelier check``
+    console entry so both run byte-for-byte the same gate. Returns the process
+    exit code (0 pass / 1 fail / 2 usage|no-contract) instead of calling
+    ``sys.exit`` so callers can dispatch it cleanly.
+    """
+    args = [a for a in (sys.argv[1:] if argv is None else argv) if a]
     if not args:
         print("usage: check.py <repo> [--contract <json>] [--max-drift N] "
               "[--allow-contrast-fail] [--max-overlap-risk N]")
-        sys.exit(2)
+        return 2
     from contract import has_contract
     repo = args[0]
     # Resolve from an explicit --contract, else the repo (design-tokens.json OR DESIGN.md).
@@ -77,7 +84,7 @@ if __name__ == "__main__":
     if not has_contract(contract):
         print(f"::error:: no contract for {contract} — need design/design-tokens.json or "
               "DESIGN.md (run generate-design-md first)")
-        sys.exit(2)
+        return 2
 
     # Drift ratchet (B3, count-based): adopt the gate on a legacy repo by baselining
     # current drift; afterwards drift may only shrink. NOTE: count-based, not git-aware —
@@ -88,7 +95,7 @@ if __name__ == "__main__":
             full_cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
         except Exception as e:
             print(f"::error:: corrupt {cfg_path}: {e}")
-            sys.exit(2)
+            return 2
         baseline = full_cfg.get("check", {}).get("drift_baseline", 0)
 
         def _write_baseline(n):
@@ -101,7 +108,7 @@ if __name__ == "__main__":
             n = len(lint_repo(repo, contract))
             _write_baseline(n)
             print(f"atelier ratchet: baseline set to {n} drift finding(s).")
-            sys.exit(0)
+            return 0
 
         # --ratchet: the drift gate becomes "<= baseline", but contrast / house-rules /
         # overlap keep their normal verdicts (don't silently drop three gates).
@@ -123,7 +130,7 @@ if __name__ == "__main__":
         print(f"atelier ratchet: drift {drift_now} vs baseline {baseline} — "
               f"{'PASS' if ratchet_ok else 'FAIL (new drift; fix or --update-baseline)'}"
               + ("" if res["ok"] else "; other gates FAILED"))
-        sys.exit(0 if ok else 1)
+        return 0 if ok else 1
 
     res = run(repo, contract, max_drift, allow_contrast, max_overlap)
     for s in res["steps"]:
@@ -138,4 +145,8 @@ if __name__ == "__main__":
     for o in [f for f in res.get("overlap_risks", []) if f["severity"] in ("critical", "important")][:20]:
         print(f"    overlap-risk {o['file']}:{o['line']} {o['kind']} — {o['detail']}")
     print("\natelier check:", "PASS" if res["ok"] else "FAIL")
-    sys.exit(0 if res["ok"] else 1)
+    return 0 if res["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

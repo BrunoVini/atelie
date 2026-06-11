@@ -1,0 +1,56 @@
+# Standalone packaging for the `atelier check` CLI (Phase 6a).
+#
+# atelier's primary form is a Claude Code skill (SKILL.md + scripts/ + ...). This
+# pyproject lets the *deterministic* design checks also ship as a tiny, stdlib-only
+# CLI installable via pipx/uvx, independent of the skill:
+#
+#     uvx --from . atelier check <path>      # from a clone
+#     pipx install .                         # then: atelier check <path>
+#     python3 -m atelier check <path>        # no install, from the repo
+#
+# Distribution name is `atelier-design` (the bare `atelier` name is a contested
+# common word on PyPI and not safe to assume free); the import package and the
+# console command are both `atelier`, so usage is `atelier check ...` regardless.
+#
+# ZERO runtime dependencies — atelier is and stays stdlib-only.
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atelier-design"
+version = "0.1.0"  # keep in sync with .claude-plugin/plugin.json
+description = "Repo-aware design studio: deterministic design QA gate (design-lint, contrast-audit, house-rules, overlap-risk) as a standalone stdlib CLI."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }  # table form: accepted by setuptools 61+ (bare PEP 639 SPDX string requires 77+)
+authors = [{ name = "Bruno Vinicius", email = "brunovinissouza@gmail.com" }]
+keywords = ["design", "design-system", "frontend", "design-tokens", "ui", "ux", "contrast", "ci", "lint"]
+dependencies = []  # stdlib-only by design
+
+[project.urls]
+Homepage = "https://github.com/BrunoVini/atelier"
+Repository = "https://github.com/BrunoVini/atelier"
+
+[project.scripts]
+atelier = "atelier.__main__:main"
+
+[tool.setuptools]
+# Two packages ship in the wheel:
+#   atelier         — the thin CLI (this directory's `atelier/`)
+#   atelier_scripts — the existing skill `scripts/` dir, mapped in unchanged so its
+#                     BARE cross-imports (`from scan_repo import ...`) keep working:
+#                     the bootstrap puts that dir on sys.path at runtime.
+packages = ["atelier", "atelier_scripts"]
+
+[tool.setuptools.package-dir]
+atelier = "atelier"
+atelier_scripts = "scripts"
+
+[tool.setuptools.package-data]
+# Bundled data the checks read at runtime, resolved __file__-relative inside the
+# package (NOT cwd-relative), so it survives an install. Today the check tree reads
+# exactly one such file — scan_repo.py -> tailwind_colors.json — but we ship every
+# non-.py data file in scripts/ to stay robust as the battery grows.
+atelier_scripts = ["*.json"]
