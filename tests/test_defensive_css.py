@@ -74,6 +74,59 @@ def test_page_with_inputs_but_no_small_font_does_not_flag():
     assert "input-zoom-ios" not in _kinds(html)
 
 
+# Non-text <input> types render no editable text → iOS Safari never zooms them, so a
+# sub-16px font on them must NOT flag (it was a gating false-positive). Each type is
+# checked in both forms: an inline style and a CSS attribute selector.
+
+_NONTEXT_TYPES = ["checkbox", "radio", "hidden", "file", "range", "color",
+                  "submit", "reset", "button", "image"]
+
+
+def test_nontext_input_types_inline_do_not_flag():
+    for t in _NONTEXT_TYPES:
+        html = _page(body=f"<input type='{t}' style='font-size:14px'>")
+        assert "input-zoom-ios" not in _kinds(html), f"inline type={t} must not flag"
+
+
+def test_nontext_input_types_selector_do_not_flag():
+    for t in _NONTEXT_TYPES:
+        html = _page(body="<input>", css=f"input[type={t}]{{font-size:14px}}")
+        assert "input-zoom-ios" not in _kinds(html), f"selector type={t} must not flag"
+
+
+def test_nontext_input_selector_quoted_does_not_flag():
+    html = _page(body="<input>", css='input[type="checkbox"]{font-size:14px}')
+    assert "input-zoom-ios" not in _kinds(html)
+
+
+def test_input_checkbox_selector_does_not_flag():
+    html = _page(body="<input>", css="input[type=checkbox]{font-size:14px}")
+    assert "input-zoom-ios" not in _kinds(html)
+
+
+def test_bare_input_inline_no_type_still_flags():
+    # No type attribute → defaults to text, which DOES zoom; must still flag.
+    html = _page(body="<input style='font-size:14px'>")
+    assert "input-zoom-ios" in _kinds(html, "important")
+
+
+def test_text_type_input_inline_still_flags():
+    html = _page(body="<input type='email' style='font-size:14px'>")
+    assert "input-zoom-ios" in _kinds(html, "important")
+
+
+def test_bare_input_selector_no_type_still_flags():
+    # `input{...}` (no type qualifier) hits text inputs too → must still flag.
+    html = _page(body="<input>", css="input{font-size:14px}")
+    assert "input-zoom-ios" in _kinds(html, "important")
+
+
+def test_select_textarea_selectors_still_flag():
+    html = _page(body="<select></select><textarea></textarea>",
+                 css="select{font-size:14px}textarea{font-size:14px}")
+    assert "input-zoom-ios" in _kinds(html)
+
+
 # --- img-no-max-width (defensive-css: img-max-width) ------------------------------
 # An inline-styled <img> with a fixed width but no max-width overflows a narrow
 # container. Scoped to inline style (low-FP: a stylesheet img{max-width:100%} or a
@@ -129,6 +182,12 @@ def test_bg_image_url_without_no_repeat_flags():
 def test_bg_shorthand_url_without_no_repeat_flags():
     html = _page(css=".hero{background:url(banner.png) center}")
     assert "bg-no-no-repeat" in _kinds(html)
+
+
+def test_bg_shorthand_explicit_repeat_keyword_does_not_flag():
+    # `repeat` is an explicit, deliberate background-repeat value — not a missing one.
+    html = _page(css=".hero{background:url(x) repeat}")
+    assert "bg-no-no-repeat" not in _kinds(html)
 
 
 def test_bg_image_with_no_repeat_does_not_flag():
