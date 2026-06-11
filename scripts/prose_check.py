@@ -25,12 +25,43 @@ _TELLS = [
     (r"\bunleash (?:the|your)\b", "unleash"),
     (r"\bharness the power\b", "harness the power"),
     (r"\brevolutioniz(?:e|es|ed|ing)\b", "revolutionize"),
+    # ported from impeccable's marketing-buzzword list (Apache-2.0, pbakaus/impeccable) —
+    # still conservative: only compound marketing phrases no honest doc reaches for.
+    (r"\bbest[- ]in[- ]class\b", "best-in-class"),
+    (r"\bindustry[- ]leading\b", "industry-leading"),
+    (r"\bworld[- ]class\b", "world-class"),
+    (r"\benterprise[- ]grade\b", "enterprise-grade"),
+    (r"\bmission[- ]critical\b", "mission-critical"),
 ]
 _COMPILED = [(re.compile(p, re.I), label) for p, label in _TELLS]
 # Strip code (fenced blocks + inline spans) before matching — a doc that DOCUMENTS the
 # banned vocabulary (in backticks / code fences) must not flag itself.
 _FENCE = re.compile(r"```.*?```", re.S)
 _INLINE_CODE = re.compile(r"`[^`]*`")
+
+
+# Aphoristic cadence (ported from impeccable, Apache-2.0, pbakaus/impeccable):
+# manufactured-contrast aphorisms ("Not a feature. A platform.") and short-rebuttal
+# closers ("X. No Y." / "X. Just Y."). Once is voice; 3+ is the AI cadence tell.
+_NOT_A = re.compile(r"\bNot an? [a-z][^.!?\n]{1,40}[.!]\s+[A-Z][^.!?\n]{1,60}[.!]")
+_SHORT_REBUTTAL = re.compile(r"\b[A-Z][^.!?\n]{4,80}[.!]\s+(?:No|Just)\s+[a-z][^.!?\n]{2,60}[.!]")
+_CADENCE_MIN = 3
+
+
+def _cadence_tells(text):
+    # The two patterns overlap on hybrids ("Not a problem. No setup needed." matches
+    # both) — dedupe by span so one phrase counts once toward the threshold.
+    spans = sorted((m.start(), m.end(), m.group(0).strip()[:80])
+                   for rx in (_NOT_A, _SHORT_REBUTTAL) for m in rx.finditer(text))
+    hits, last_end = [], -1
+    for start, end, h in spans:
+        if start < last_end:
+            continue                              # overlaps the previous hit — same phrase
+        hits.append(h)
+        last_end = end
+    if len(hits) < _CADENCE_MIN:
+        return []
+    return [(h, "aphoristic cadence") for h in hits]
 
 
 def prose_tells(text):
@@ -41,6 +72,7 @@ def prose_tells(text):
     for rx, label in _COMPILED:
         for m in rx.finditer(text):
             out.append((m.group(0), label))
+    out.extend(_cadence_tells(text))
     return out
 
 

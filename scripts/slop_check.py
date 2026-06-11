@@ -27,6 +27,10 @@ import re
 import sys
 from collections import Counter
 
+# rules ported from impeccable (Apache-2.0, pbakaus/impeccable) live in slop_ported.py;
+# this file stays the single entry point and merges their findings into the battery.
+from slop_ported import FONT_DECL, GFONT, TAG, css_blocks, ported_tells, shadow_blur_px
+
 _SLOP_FONTS = {"inter", "roboto", "arial", "helvetica", "system-ui",
                "-apple-system", "blinkmacsystemfont", "segoe ui", "open sans", "lato"}
 _PURPLE = re.compile(
@@ -34,8 +38,6 @@ _PURPLE = re.compile(
     r"#6366f1|#4f46e5|#9333ea|#7e22ce|#667eea|#764ba2|rebeccapurple)", re.I)
 # Tailwind utility gradient in the same family (bg-gradient-to-r from-violet-600 …).
 _TW_PURPLE_GRADIENT = re.compile(r"\b(?:from|via|to)-(?:violet|indigo|purple|fuchsia)-\d{2,3}\b", re.I)
-_FONT_DECL = re.compile(r"font-family\s*:\s*([^;{}]+)", re.I)
-_GFONT = re.compile(r"family=([A-Za-z0-9+]+)", re.I)
 _BACKDROP = re.compile(r"backdrop-filter\s*:\s*blur", re.I)
 # The cliché is a CHUNKY colored accent border (3-4px), not a 1px neutral divider —
 # require >=2px so a normal column divider doesn't trip it.
@@ -47,14 +49,13 @@ _FONT_FALLBACKS = {"serif", "sans-serif", "monospace", "inherit", "initial", "un
 
 # --- text extraction (run copy tells on what the user actually reads) ---
 _SCRIPT_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?</\1>", re.I | re.S)
-_TAG = re.compile(r"<[^>]+>")
 _LINKLABEL = re.compile(r"<(a|button)\b[^>]*>(.*?)</\1>", re.I | re.S)
 _ENTITIES = (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&nbsp;", " "),
              ("&mdash;", "—"), ("&#8212;", "—"), ("&copy;", "©"))
 
 
 def _visible_text(html):
-    txt = _TAG.sub(" ", _SCRIPT_STYLE.sub(" ", html))
+    txt = TAG.sub(" ", _SCRIPT_STYLE.sub(" ", html))
     for a, b in _ENTITIES:
         txt = txt.replace(a, b)
     return re.sub(r"\s+", " ", txt).strip()
@@ -63,7 +64,7 @@ def _visible_text(html):
 def _cta_labels(html):
     out = []
     for m in _LINKLABEL.finditer(html):
-        t = re.sub(r"\s+", " ", _TAG.sub(" ", m.group(2))).strip()
+        t = re.sub(r"\s+", " ", TAG.sub(" ", m.group(2))).strip()
         if t:
             out.append(t)
     return out
@@ -386,6 +387,26 @@ def _profile_tells(html, profile):
         if re.search(r"repeating-linear-gradient", html, re.I):
             findings.append({"severity": "polish", "kind": "codex-stripe-gradient",
                              "detail": "repeating stripe gradient — a Codex decorative default"})
+    elif p == "gpt":
+        # "ghost card": hairline border + wide diffuse shadow in the same rule —
+        # commit to a defined edge OR a soft elevation, not both (ported from
+        # impeccable's gpt-thin-border-wide-shadow, gated the same way).
+        for sel, body in css_blocks(html):
+            if not re.search(r"border\s*:\s*1(?:px)?\b|"
+                             r"border(?:-(?:top|right|bottom|left))?-width\s*:\s*1px", body, re.I):
+                continue
+            sm = re.search(r"box-shadow\s*:\s*([^;}]+)", body, re.I)
+            if sm and shadow_blur_px(sm.group(1)) >= 16:
+                findings.append({"severity": "polish", "kind": "gpt-ghost-card",
+                                 "detail": "hairline border + wide diffuse shadow on one card — "
+                                           "a GPT signature; pick a defined edge or a soft "
+                                           "elevation, not both"})
+                break
+        m = re.search(r"\b\w+\s+theater\b", _visible_text(html), re.I)
+        if m:
+            findings.append({"severity": "polish", "kind": "gpt-theater-copy",
+                             "detail": f"“{m.group(0)}” — the ‘X theater’ framing is a GPT copy "
+                                       "tic; say plainly what the thing does or doesn't do"})
     elif p == "gemini":
         if re.search(r"<img\b", html, re.I) and \
            re.search(r":hover[^{]*\{[^}]*transform\s*:\s*scale", html, re.I):
@@ -400,12 +421,12 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
 
     # 1. Overused/generic primary fonts (unless the contract sanctions them).
     used = []
-    for decl in _FONT_DECL.findall(html):
+    for decl in FONT_DECL.findall(html):
         first = decl.split(",")[0].strip().strip("'\"")
         if "var(" in first.lower() or not first:   # a token ref isn't a typeface
             continue
         used.append(first)
-    for fam in _GFONT.findall(html):
+    for fam in GFONT.findall(html):
         used.append(fam.replace("+", " "))
     for fam in used:
         low = fam.lower()
@@ -452,6 +473,7 @@ def check_html(html, allowed_fonts=None, profile=None, contract=None):
     findings.extend(_a11y_tells(html))
     findings.extend(_proof_tells(html))
     findings.extend(_dead_anchor_tells(html))
+    findings.extend(ported_tells(html, allowed))    # impeccable-ported static rules
     findings.extend(_profile_tells(html, profile))
     return findings
 

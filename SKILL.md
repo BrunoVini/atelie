@@ -179,6 +179,10 @@ only the lines the PR changed, as GitHub annotations.
 If you can't render (no browser), say so and rely on the static checks. Skipping this is
 the difference between "I made a page" and "I made a verified, on-contract page."
 
+The quantified thresholds these checks enforce (line length, hero/body sizes, tracking,
+line-height, font count, easing, …) live in `references/design-laws.md` — the checklist
+companion to `design-philosophy.md`.
+
 **Anti-slop gets you to *clean*; craft is what makes it *win*.** For any landing / hero /
 marketing surface, also clear the craft gates in `references/capabilities/landing-craft.md`
 (hero focal-moment + depth, scroll-reveal that pays off below the fold, no template filler,

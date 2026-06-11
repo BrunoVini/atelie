@@ -17,6 +17,7 @@ applied to a form read as junior, not polished.
 
 - **No poster type.** Heading sizes are functional (a clear `h1`, quiet section headers), not
   a 64px display face. A settings page titled in a dramatic serif looks like it's trying too hard.
+  See `../design-laws.md` for the quantified thresholds (and which are auto-checked).
 - **Accent is for the ONE primary action, not everywhere.** The save/submit button gets the
   brand color. Avatars, section icons, toggle tracks, kickers, and card borders do **not** each
   get an accent fill — a page where the accent appears 15 times has no primary action at all.

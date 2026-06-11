@@ -57,6 +57,10 @@ When the task IS to show anti-design (e.g. a "what is AI slop" demo), isolate th
 bad sample in an honest container with a dashed border + "Counter-example — do
 not do this" badge, so it serves the narrative without polluting the page.
 
+For the quantified version of these rules — the exact thresholds (line length,
+hero/body sizes, tracking, line-height, font count, easing) and which the QA
+battery enforces — see `design-laws.md`.
+
 ## 4. Match implementation to vision
 
 Maximalist visions need elaborate code (extensive animation, effects, layered

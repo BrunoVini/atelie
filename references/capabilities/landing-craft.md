@@ -271,6 +271,9 @@ A characterful pairing chosen well is only half the type work. The detail that r
 Ask: *fluid scale off one ratio · tabular-nums on every figure · measure capped + balanced
 headings · metric-matched fallback so nothing reflows?* If any is "no", it reads as default.
 
+See `../design-laws.md` for the quantified thresholds (hero ceiling, tracking floor,
+line-height, measure, font count) and which the QA battery enforces.
+
 ## 9. Honest proof — never fabricate social proof
 
 A greenfield or fictional product has no customers yet. Inventing a customer **logo wall**,

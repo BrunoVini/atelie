@@ -83,7 +83,11 @@ def test_slop_check_flags_tells_but_respects_contract():
     assert "generic-font" in kinds and "purple-gradient" in kinds
     # contract-sanctioned font is not slop
     assert not any(f["kind"] == "generic-font" for f in check_html('<style>body{font-family:Inter}</style>', ["Inter"]))
-    assert check_html('<style>body{font-family:Fraunces,serif}</style>') == []
+    # the Fraunces/Geist monoculture wave is advisory (polish), never important — and a
+    # contract-sanctioned face stays clean (overused-font ported from impeccable)
+    fr = check_html('<style>body{font-family:Fraunces,serif}</style>')
+    assert {f["kind"] for f in fr} == {"overused-font"} and fr[0]["severity"] == "polish"
+    assert check_html('<style>body{font-family:Fraunces,serif}</style>', ["Fraunces"]) == []
 
 
 def test_slop_copy_and_editorial_tells():
