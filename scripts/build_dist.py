@@ -2,7 +2,7 @@
 """Build atelier's single source into harness-specific distribution trees.
 
 atelier is authored once as a Claude Code native skill (the repo root: SKILL.md +
-scripts/ references/ assets/ templates/ hooks/ + .claude-plugin/). Other harnesses
+scripts/ references/ assets/ templates/ hooks/ commands/ + .claude-plugin/). Other harnesses
 (Codex, Cursor, ...) read skills from different directories and accept a different
 slice of SKILL.md frontmatter. This script transforms the one source into a faithful
 per-harness tree under --out, without ever touching the live repo.
@@ -31,9 +31,10 @@ import sys
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SKILL_NAME = "atelier"
 
-# Source directories that may be carried into a harness build. "hooks" is special:
-# it holds the Claude-Code-only collision gate and is included only where supported.
-SOURCE_DIRS = ("scripts", "references", "assets", "templates", "hooks")
+# Source directories that may be carried into a harness build. "hooks" and
+# "commands" are special: both are Claude-Code-only features (the collision gate
+# and the slash commands) and are included only where supported.
+SOURCE_DIRS = ("scripts", "references", "assets", "templates", "hooks", "commands")
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +63,7 @@ HARNESSES = {
         # Native plugin layout: .claude/skills/<name>/ + .claude-plugin manifest.
         "skill_root": os.path.join(".claude", "skills", SKILL_NAME),
         "frontmatter": ["license"],  # Claude Code accepts the spec `license` field.
-        "include_dirs": ["scripts", "references", "assets", "templates", "hooks"],
+        "include_dirs": ["scripts", "references", "assets", "templates", "hooks", "commands"],
         "plugin": True,
     },
     "codex": {

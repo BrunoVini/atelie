@@ -1,12 +1,14 @@
 # atelier
 
-**A Claude Code plugin: a repo-aware design studio that *governs* your design — it doesn't just generate pages.**
+**A repo-aware design studio that *governs* your design — it doesn't just generate pages.** Ships as a Claude Code plugin, a standalone CLI, and a multi-harness skill (Codex / Cursor).
 
 Most design tools (AI or otherwise) generate a pretty artifact and walk away.
 atelier does the senior thing: it **measures** the design language already living
 in your codebase, writes it down as an **enforceable contract** (`DESIGN.md` +
 machine-readable tokens), and then makes every output — and every future change —
 obey it. One bold, intentional aesthetic per project; never generic AI slop.
+The axis atelier wins on: **measured from your code, contract-bound, qa-gated, and
+governed over time** — not a one-shot prompt.
 
 > The difference: pretty pages are table stakes. A design system that is
 > *measured from your code, enforced in CI, audited for accessibility, and kept
@@ -29,6 +31,28 @@ pages, components, slides, animations, previews, variants, reviews, layout score
 "weigh the options", or "make it look good". The Python scripts use the stdlib
 (no install needed); `screenshot.mjs` / `diff_screens.mjs` / `responsive_check.mjs`
 and video export are optional and need Node + a headless browser.
+
+### Beyond Claude Code
+
+atelier is authored once and also builds for **Codex** and **Cursor** via
+`python3 scripts/build_dist.py --harness all` (see [HARNESSES.md](HARNESSES.md)). The
+collision-gate hook that forces a re-check before an agent stops is Claude-Code-only —
+a documented degradation; the self-QA loop (`qa.py`) runs on every harness.
+
+## Commands
+
+atelier triggers on natural language for everything; these slash commands are explicit
+shortcuts into the highest-value workflows:
+
+| Command | What it does |
+|---|---|
+| `/atelier:design-md` | Measure the repo and generate or refresh its `DESIGN.md` contract + tokens |
+| `/atelier:check` | Run the deterministic design gate (drift + contrast + house-rules + overlap) |
+| `/atelier:review` | Design review + layout score + self-QA on an artifact or repo (register-aware) |
+| `/atelier:refine` | Apply a named refinement move (bolder / quieter / distill / harden / delight) |
+| `/atelier:preview` | Open live mode — themed preview or injecting proxy over your dev server |
+| `/atelier:variants` | Produce 2–3 distinct, on-contract design directions with content parity |
+| `/atelier:migrate` | Token-migration codemod — rewrite hardcoded values to `var(--token)` |
 
 ### Standalone CLI — `atelier check`
 
@@ -103,6 +127,11 @@ And on *every* artifact — even from-scratch work with no repo to measure — i
 progressive-enhancement — content must render without JavaScript). That mechanical
 verification of its own output is the delta a blank model can't reproduce.
 
+An optional **`register`** in the contract — `brand` or `product` — shifts what counts
+as slop: decoration-cost tells (glassmorphism, oversized hero) gate hard on a *product*
+surface, while generic / monotonous "safe" tells gate on a *brand* surface. The same gate,
+tuned to what the surface is for.
+
 ## Everything atelier does
 
 Three phases, one contract — measure first, generate on-contract, then keep it honest:
@@ -110,12 +139,14 @@ Three phases, one contract — measure first, generate on-contract, then keep it
 - **MEASURE** — extracts an empirical `DESIGN.md` from your code (colors by perceptual
   ΔE, fonts, spacing, breakpoints, stack), stays honest about messy repos, and can seed
   from a reference image or URL.
-- **GENERATE** — prototypes, themed live previews, slides, animation/video, SVG, living
-  style guides, responsive sweeps, and multi-brand / dark-mode / native theming — all
-  bound to the contract.
-- **GOVERN** — slop detector, WCAG contrast audit, overlap hunting, design lint,
-  house-rule enforcement, token-migration codemod, a 0–100 coherence score, and CI / PR
-  gates.
+- **GENERATE** — prototypes, live mode over your running dev server, slides,
+  animation/video, SVG, living style guides, responsive sweeps, named refinement moves
+  (bolder / quieter / distill / harden / delight), and multi-brand / dark-mode / native
+  theming — all bound to the contract.
+- **GOVERN** — slop detector (including the second-order "predictable safe choice" tell),
+  WCAG contrast audit, overlap hunting, design lint, defensive-CSS rules, quantified
+  design laws, house-rule enforcement, token-migration codemod, a 0–100 coherence score,
+  and CI / PR gates.
 
 <details>
 <summary><b>Full capability list</b></summary>
@@ -146,14 +177,22 @@ Three phases, one contract — measure first, generate on-contract, then keep it
 
 - **Hi-fi prototypes / app mockups / device frames**, real UI code written into an
   existing repo, and **2–3 distinct design directions** to choose from.
+- **Named refinement moves** — *bolder / quieter* (intensity ±), *distill*, *harden* (the
+  empty / loading / error / long-content states), and one earned *delight*. Register-aware
+  and bound to the design laws, so "make it pop" or "tone it down" is a contract-safe move,
+  not a free-for-all.
 - **Landing / marketing-page craft** — an owned aesthetic over the genre default, a real
   focal moment with depth, a production **type-engineering floor** (fluid `clamp()` scale,
   tabular/slashed-zero numerals, balanced rag, a metric-matched fallback so the body stays
   characterful offline), and **honest proof only** (no fabricated logo walls, testimonials,
   or scale-theater stats).
-- **Themed live preview** — a local server that serves your output themed by your own
-  tokens, with click-to-select, plus **live element iteration** (pick an element →
-  contract-bound variants → accept back into source, with journaled undo).
+- **Live mode** — two ways in. A themed local server serves a standalone artifact under
+  your own tokens with click-to-select; or, when you point it at your **running Vite / Next
+  dev server**, an overlay-injecting **reverse proxy** lets you pick an element and slide
+  parametrized, on-contract variants (range / steps / toggle) over your live app. Accepting
+  a variant back into source is **gated by `qa.py` with auto-revert** — the edit is written,
+  the battery re-runs, and a FAIL restores the original bytes, so a bad variant never sticks.
+  (Websocket / HMR passthrough is best-effort.)
 - **Slides / decks / presentations.**
 - **Animations / explainers / narrated video** (MP4·GIF, with motion best-practices,
   pitfalls, cinematic patterns, scene templates, and BGM), **scroll-driven motion**
@@ -179,6 +218,15 @@ Three phases, one contract — measure first, generate on-contract, then keep it
   testimonials for a product with no real customers), **scale-theater** stats, and **dead /
   self-anchored links**. "No slop" is a *check*, not just a prompt, and it binds in the
   self-QA loop.
+- **Second-order anti-sameness (reflex-reject).** Beyond the obvious AI tells, it catches
+  the *predictable* "safe" choice for a product category — every fintech reaching for
+  emerald + a serif display — so the output doesn't converge on the genre cliché.
+- **Defensive CSS.** All 25 [defensivecss.dev](https://defensivecss.dev) techniques are
+  cataloged; the cleanly-static, low-false-positive ones ship as enforced rules — iOS
+  input-zoom (`font-size < 16px` on text controls), image overflow, background-repeat.
+- **Quantified design laws.** `design-laws.md` is one page of numeric thresholds (line
+  length 65–75ch, ≤3 fonts, hero ≤6rem, tracking floor, easing) — each cross-linked to the
+  check that enforces it, so the law and the gate can't drift apart.
 - **Progressive-enhancement gate.** A page must show its content *without JavaScript*: it
   renders the page with scripts stripped and flags content gated behind a JS-only reveal —
   and a reveal that never fires (content stuck at `opacity:0` *with* JS on). The pattern that
@@ -213,6 +261,7 @@ lint, contrast, overlap, and CI tools keep it that way.
 ## Quick start
 
 ```bash
+python3 scripts/context.py <repo>                           # step-0: contract state, register, stack
 python3 scripts/scan_repo.py <repo>                         # empirical design report
 python3 scripts/assess.py <repo>                            # consistency: clean | minor | messy
 python3 scripts/export_tokens.py tokens.json design         # tokens.css + preset + W3C json
@@ -226,7 +275,8 @@ python3 scripts/design_report.py <repo>                     # coherence score ->
 python3 scripts/slop_check.py page.html --contract <repo>   # AI-slop tells
 python3 scripts/overlap_risk.py <repo>                      # static overlap-risk lint (no render)
 python3 scripts/build_styleguide.py design/design-tokens.json   # living style guide
-scripts/preview/start.sh --project-dir <repo>              # live preview server (free port)
+scripts/preview/start.sh --project-dir <repo>              # themed live preview server (free port)
+node scripts/preview/live-proxy.cjs <dev-server-url>       # injecting proxy over a running Vite/Next app
 node scripts/responsive_check.mjs page.html                # width sweep (tablet zone + overlaps)
 node scripts/reveal_check.mjs page.html                    # progressive enhancement: content without JS
 node scripts/screenshot.mjs page.html shot.png             # capture for review/scoring
@@ -238,9 +288,13 @@ Routing for every capability is in `SKILL.md`; depth lives in `references/`.
 ## Development
 
 ```bash
-pip install pytest              # (test dep; not bundled)
-python3 -m pytest tests/ -v     # script test suite
+python3 tests/run.py            # 458 tests, zero runtime dependencies (stdlib runner)
 ```
+
+An opt-in **skill-behavior suite** (`tests/skill_behavior/`) additionally asserts that the
+model *follows* `SKILL.md` by its tool-call trace (measure-before-generate, `qa.py`-before-
+done, collision reaction); its assertion engine is verified offline and the live runner
+degrades cleanly without an API key.
 
 ## License
 
