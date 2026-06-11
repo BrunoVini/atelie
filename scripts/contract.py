@@ -143,9 +143,238 @@ def _contract_from_block(block, path):
     contrast = block.get("contrast")
     if isinstance(contrast, dict):
         out["contrast"] = contrast
+    # OPTIONAL typography map (additive): {role: {family,size,weight,line_height,
+    # tracking,features}}. Accepts Stitch camelCase (fontFamily/fontSize/...) and
+    # atelier snake_case; `features` is a LIST of OpenType tags (atelier enrichment).
+    typo = _normalize_typography(block.get("typography"))
+    if typo:
+        out["typography"] = typo
+    # OPTIONAL components map (additive): per-component minimum specs. Each component
+    # dict is SHALLOW-copied (top-level keys only) and values are surfaced as-is —
+    # `{ref}` strings are NOT resolved here (that's the consumer's job).
+    comps = block.get("components")
+    if isinstance(comps, dict) and comps:
+        out["components"] = {k: dict(v) if isinstance(v, dict) else v
+                             for k, v in comps.items()}
     if dropped or dark_dropped:
         out["machine_block_dropped"] = dropped + dark_dropped
     return out
+
+
+# --- typography normalization (shared by the machine block + Stitch importer) ----
+# Normalized per-role shape (atelier's chosen contract model):
+#   {role: {"family": str, "size": str, "weight": str, "line_height": str,
+#           "tracking": str, "features": [str, ...]}}
+# Only keys that were present are emitted (no fabricated defaults), EXCEPT `features`
+# is always a list (possibly empty) so consumers can iterate without a None-guard.
+# Accepts BOTH Stitch camelCase and atelier snake_case input aliases.
+_TYPO_ALIASES = {
+    "family": ("fontFamily", "font", "family"),
+    "size": ("fontSize", "size"),
+    "weight": ("fontWeight", "weight"),
+    "line_height": ("lineHeight", "line_height", "leading"),
+    "tracking": ("letterSpacing", "tracking", "letter_spacing"),
+}
+
+
+def _normalize_typography(raw):
+    """Map a {role: {...}} typography block to atelier's normalized shape. Returns
+    a dict (empty if `raw` is not a usable dict). Bare scalars are stringified;
+    `features`/`fontFeature` collapses to a list of OpenType tags."""
+    if not isinstance(raw, dict) or not raw:
+        return {}
+    out = {}
+    for role, spec in raw.items():
+        if not isinstance(spec, dict):
+            continue
+        norm = {}
+        for canon, aliases in _TYPO_ALIASES.items():
+            for a in aliases:
+                if a in spec and spec[a] is not None:
+                    norm[canon] = str(spec[a])
+                    break
+        # OpenType features: accept a list (`features`) or scalar(s)
+        # (`fontFeature`/`feature`), always normalize to a list of tags.
+        feats = []
+        fv = spec.get("features")
+        if isinstance(fv, list):
+            feats = [str(t) for t in fv if t is not None]
+        elif isinstance(fv, str) and fv.strip():
+            feats = [t.strip() for t in fv.split(",") if t.strip()]
+        for key in ("fontFeature", "feature", "fontFeatureSettings"):
+            sv = spec.get(key)
+            if isinstance(sv, str) and sv.strip():
+                feats += [t.strip().strip('"\'') for t in sv.split(",") if t.strip()]
+            elif isinstance(sv, list):
+                feats += [str(t) for t in sv if t is not None]
+        # De-duplicate preserving order, so `features:[ss01]` + `fontFeature:ss01`
+        # doesn't yield ['ss01', 'ss01'].
+        norm["features"] = list(dict.fromkeys(feats))
+        out[role] = norm
+    return out
+
+
+def _first_family(font_family):
+    """First family token from a CSS font-family string (drops fallbacks/quotes).
+    Skips a `{ref}` placeholder so an unresolved reference never leaks into fonts."""
+    if not isinstance(font_family, str):
+        return None
+    first = font_family.split(",")[0].strip().strip('"\'')
+    if first.startswith("{"):
+        return None
+    return first or None
+
+
+# --- Google Stitch DESIGN.md importer ----------------------------------------
+# Stitch ships its contract as a YAML front-matter block delimited by `---`. There's
+# no PyYAML here, so we parse the needed subset ourselves: indentation-nested maps
+# (space- or tab-indented), `key: value` scalars (quotes stripped), `key:` -> nested
+# block. Defensive: tolerates blank lines and `#` comment lines, and is CRLF-tolerant.
+# Not a full YAML parser — flow/inline collections, anchors, and multi-line scalars
+# are out of scope.
+_FRONTMATTER = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.S)
+
+
+def _strip_scalar(v):
+    """Strip surrounding quotes + trailing inline comment from a YAML scalar value."""
+    v = v.strip()
+    q = v[:1]
+    if q in ("'", '"'):
+        # Quoted: take through the closing quote, ignore any trailing inline comment.
+        end = v.find(q, 1)
+        if end != -1:
+            return v[1:end]
+        return v[1:]
+    # Unquoted: drop a trailing ` # comment`.
+    h = v.find(" #")
+    if h != -1:
+        v = v[:h].rstrip()
+    return v
+
+
+def _parse_frontmatter(text):
+    """Parse the Stitch YAML front-matter subset into a nested dict.
+
+    Handles space- or tab-indented nested maps and `key: value` / `key:` lines.
+    Values are returned as strings (quotes stripped); nested blocks as dicts.
+    Best-effort and defensive — blank lines and `#`-comment lines are skipped;
+    unparseable lines are ignored rather than raising. CRLF-tolerant: raw `\r\n`
+    text (e.g. passed directly to from_stitch) is normalized before scanning, so
+    detection no longer depends on open() having normalized newlines."""
+    text = text.replace("\r\n", "\n")
+    m = _FRONTMATTER.search(text)
+    body = m.group(1) if m else text
+    root = {}
+    # Stack of (indent, container) so deeper-indented keys nest under their parent.
+    stack = [(-1, root)]
+    for raw_line in body.splitlines():
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
+        # Measure indent against spaces AND tabs so a tab-indented child nests
+        # under its parent instead of flattening to root.
+        indent = len(raw_line) - len(raw_line.lstrip(" \t"))
+        line = raw_line.strip()
+        if ":" not in line:
+            continue
+        key, _, rest = line.partition(":")
+        key = _strip_scalar(key)
+        if not key:
+            continue
+        # Pop back to the parent whose indent is shallower than this line's.
+        while len(stack) > 1 and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1]
+        rest = rest.strip()
+        if rest == "":                       # `key:` -> open a nested map
+            child = {}
+            if isinstance(parent, dict):
+                parent[key] = child
+            stack.append((indent, child))
+        else:                                # `key: value` scalar leaf
+            if isinstance(parent, dict):
+                parent[key] = _strip_scalar(rest)
+    return root
+
+
+def from_stitch(text_or_path):
+    """Map a Google Stitch DESIGN.md (front matter) into atelier's contract model.
+
+    Accepts a path to a DESIGN.md file, the raw front-matter text, OR an
+    already-parsed front-matter dict (so callers that have parsed it once — e.g.
+    `_from_design_md` — can route without re-parsing). Produces the same contract
+    shape as the machine block: colors (hex map, non-hex recorded in
+    machine_block_dropped), fonts (distinct first-family per typography role,
+    order-preserving), spacing, radius (from `rounded`), typography (normalized),
+    components (shallow-copied). `source_format` is set to "stitch" for traceability."""
+    path = None
+    if isinstance(text_or_path, dict):
+        fm = text_or_path                       # already-parsed front matter
+    else:
+        text = text_or_path
+        if isinstance(text_or_path, str) and os.path.isfile(text_or_path):
+            path = text_or_path
+            text = open(text_or_path, encoding="utf-8").read()
+        fm = _parse_frontmatter(text)
+
+    raw_colors = fm.get("colors") if isinstance(fm.get("colors"), dict) else {}
+    colors, dropped = {}, []
+    for k, v in raw_colors.items():
+        if isinstance(v, str) and v.startswith("#"):
+            try:
+                colors[k] = _norm_hex(v)
+            except Exception:
+                dropped.append(k)
+        else:
+            dropped.append(k)
+
+    typo = _normalize_typography(fm.get("typography"))
+    # fonts: distinct first-family per typography role, order-preserving.
+    fonts = []
+    raw_typo = fm.get("typography") if isinstance(fm.get("typography"), dict) else {}
+    for role, spec in raw_typo.items():
+        if not isinstance(spec, dict):
+            continue
+        fam = _first_family(spec.get("fontFamily") or spec.get("font") or spec.get("family"))
+        if fam and fam not in fonts:
+            fonts.append(fam)
+
+    spacing = [str(v) for v in (fm.get("spacing") or {}).values()] \
+        if isinstance(fm.get("spacing"), dict) else []
+    radius = [str(v) for v in (fm.get("rounded") or {}).values()] \
+        if isinstance(fm.get("rounded"), dict) else []
+
+    out = {
+        "source": path,
+        "source_format": "stitch",
+        "colors": colors,
+        "fonts": fonts,
+        "spacing": spacing,
+        "radius": radius,
+        "depth": None,
+        "register": None,
+    }
+    if typo:
+        out["typography"] = typo
+    comps = fm.get("components")
+    if isinstance(comps, dict) and comps:
+        # Shallow-copy each component dict; values (incl. `{ref}` strings) surfaced
+        # as-is — references are NOT resolved here (that's the consumer's job).
+        out["components"] = {k: dict(v) if isinstance(v, dict) else v
+                             for k, v in comps.items()}
+    if dropped:
+        out["machine_block_dropped"] = dropped
+    return out
+
+
+def _is_stitch_frontmatter(text):
+    """A genuine Stitch front matter: a leading `---\\n...\\n---` block carrying BOTH a
+    top-level `colors:` map AND a `typography:` map."""
+    text = text.replace("\r\n", "\n")   # CRLF-tolerant: detect raw \r\n Stitch text too
+    m = _FRONTMATTER.search(text)
+    if not m:
+        return False
+    fm = _parse_frontmatter(text)
+    return isinstance(fm.get("colors"), dict) and isinstance(fm.get("typography"), dict)
 
 
 def _from_design_md(path):
@@ -163,6 +392,18 @@ def _from_design_md(path):
         c = _from_design_md_prose(text, path)
         c["machine_block"] = "not-an-object"
         return c
+    # No fenced atelier-contract block. ADDITIVE: a genuine Stitch front matter (a
+    # leading --- block with both colors: and typography: maps) routes through
+    # from_stitch. atelier's own DESIGN.md files use the fenced block (handled above)
+    # and carry no such front matter, so they're unaffected.
+    # Parse the front matter ONCE and route on the parsed dict (no double parse).
+    norm = text.replace("\r\n", "\n")
+    if _FRONTMATTER.search(norm):
+        fm = _parse_frontmatter(norm)
+        if isinstance(fm.get("colors"), dict) and isinstance(fm.get("typography"), dict):
+            c = from_stitch(fm)                  # pass the already-parsed dict
+            c["source"] = path
+            return c
     return _from_design_md_prose(text, path)
 
 
