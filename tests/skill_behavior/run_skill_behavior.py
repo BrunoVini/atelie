@@ -22,7 +22,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from agent import LiveAnthropicAgent, AgentUnavailable  # noqa: E402
+from agent import LiveAnthropicAgent, AgentUnavailable, ScenarioAPIError  # noqa: E402
 from assertions import evaluate  # noqa: E402
 from scenarios import SCENARIOS  # noqa: E402
 from tools import make_tools, seed_skill_into_workspace, SKILL_ROOT  # noqa: E402
@@ -55,10 +55,11 @@ def main() -> int:
     agent = LiveAnthropicAgent(model=model)
     system_prompt = load_skill_body()
 
-    # Probe availability once with a trivial empty run so we can skip cleanly.
+    # Probe availability once so we can skip the whole suite cleanly. This is a
+    # cheap findability probe — find_spec only checks the SDK is importable and
+    # the key is set; it does NOT import or initialise anything. The real import
+    # and client construction happen later, inside agent.run().
     try:
-        # Instantiating is fine; the SDK/key check happens inside run(). Do a
-        # cheap guard by attempting the import + key read the same way run does.
         import importlib.util
         if importlib.util.find_spec("anthropic") is None:
             raise AgentUnavailable("anthropic SDK is not installed.")
@@ -89,6 +90,19 @@ def main() -> int:
         except AgentUnavailable as exc:  # belt-and-suspenders
             print(f"SKIP: {name} — {exc}")
             skipped += 1
+            continue
+        except ScenarioAPIError as exc:
+            # A per-scenario API error (rate limit / transient 5xx / bad
+            # request). Report it as THIS scenario's failure and carry on —
+            # one bad call must not abort the whole report — never a pass.
+            print(f"F {name}: API error — {exc}")
+            failed += 1
+            continue
+        except Exception as exc:  # noqa: BLE001 — any other SDK/runtime error
+            # Defensive catch-all so an unexpected per-scenario error still
+            # fails just that scenario and the runner exits cleanly.
+            print(f"F {name}: unexpected error — {type(exc).__name__}: {exc}")
+            failed += 1
             continue
         verdict = evaluate(trace, scenario["expectations"])
         mark = "." if verdict.ok else "F"

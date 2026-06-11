@@ -21,9 +21,12 @@ _SB_DIR = os.path.join(_TESTS_DIR, "skill_behavior")
 if _SB_DIR not in sys.path:
     sys.path.insert(0, _SB_DIR)
 
+import types  # noqa: E402
+
 from agent import Trace, ReplayAgent, LiveAnthropicAgent, AgentUnavailable  # noqa: E402
 from assertions import evaluate  # noqa: E402
 from scenarios import SCENARIOS, by_name  # noqa: E402
+from tools import make_tools  # noqa: E402
 
 _FIXTURES = os.path.join(_SB_DIR, "fixtures")
 
@@ -161,3 +164,69 @@ def test_live_agent_raises_agent_unavailable_without_sdk_or_key():
         pytest.skip("SDK and key both present — graceful-degradation path not exercised here")
     with pytest.raises(AgentUnavailable):
         a.run("sys", "hi", {}, "/tmp", max_steps=1)
+
+
+def test_live_agent_translates_auth_error_to_unavailable():
+    # An invalid key surfaces from the SDK as anthropic.AuthenticationError.
+    # LiveAnthropicAgent.run() must translate that into AgentUnavailable (an
+    # environment/credential problem == skip-worthy), NOT let the raw 401
+    # propagate as a traceback. We exercise this WITHOUT the real SDK by
+    # injecting a fake `anthropic` module into sys.modules: stub exception
+    # classes plus a client whose messages.create raises AuthenticationError.
+    fake = types.ModuleType("anthropic")
+
+    class AuthenticationError(Exception):
+        pass
+
+    class PermissionDeniedError(Exception):
+        pass
+
+    class APIError(Exception):
+        pass
+
+    class _Messages:
+        def create(self, **kwargs):
+            raise AuthenticationError("invalid x-api-key (401)")
+
+    class _Client:
+        def __init__(self, api_key=None):
+            self.messages = _Messages()
+
+    fake.AuthenticationError = AuthenticationError
+    fake.PermissionDeniedError = PermissionDeniedError
+    fake.APIError = APIError
+    fake.Anthropic = _Client
+
+    prev_mod = sys.modules.get("anthropic")
+    prev_key = os.environ.get("ANTHROPIC_API_KEY")
+    sys.modules["anthropic"] = fake
+    os.environ["ANTHROPIC_API_KEY"] = "sk-fake-invalid"
+    try:
+        a = LiveAnthropicAgent()
+        tools = make_tools("/tmp")
+        with pytest.raises(AgentUnavailable):
+            a.run("sys", "hi", tools, "/tmp", max_steps=1)
+    finally:
+        # Restore sys.modules and the env var to avoid leaking into other tests.
+        if prev_mod is None:
+            sys.modules.pop("anthropic", None)
+        else:
+            sys.modules["anthropic"] = prev_mod
+        if prev_key is None:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["ANTHROPIC_API_KEY"] = prev_key
+
+
+def test_write_to_directory_returns_clean_error(tmp_path):
+    # Writing to a path that resolves to a directory must return a clean error
+    # string, not raise IsADirectoryError. Mirrors read_fn's directory guard.
+    ws = str(tmp_path)
+    os.mkdir(os.path.join(ws, "adir"))
+    tools = make_tools(ws)
+    out = tools["write"]["fn"]({"path": "adir", "contents": "x"})
+    assert "is a directory" in out.lower()
+    assert "Error" not in out or "directory" in out.lower()
+    # Writing to the workspace root itself is also a directory.
+    out_root = tools["write"]["fn"]({"path": ".", "contents": "x"})
+    assert "is a directory" in out_root.lower()

@@ -81,7 +81,7 @@ def make_tools(workspace_dir: str) -> Dict[str, Dict[str, Any]]:
         command = inp.get("command", "")
         try:
             proc = subprocess.run(
-                ["bash", "-lc", command],
+                ["bash", "-c", command],
                 cwd=workspace_dir,
                 capture_output=True,
                 text=True,
@@ -113,6 +113,11 @@ def make_tools(workspace_dir: str) -> Dict[str, Dict[str, Any]]:
         resolved, err = _safe_resolve(workspace_dir, inp.get("path", ""))
         if err:
             return f"Error: {err}"
+        if os.path.isdir(resolved):
+            # Writing to a directory (or the workspace root) would raise a
+            # confusing IsADirectoryError. Return a clean error, mirroring
+            # read_fn's directory guard.
+            return f"Path is a directory: {inp.get('path')}. Cannot write a file there."
         contents = inp.get("contents", "")
         os.makedirs(os.path.dirname(resolved), exist_ok=True)
         with open(resolved, "w", encoding="utf-8") as fh:

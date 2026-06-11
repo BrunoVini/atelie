@@ -94,11 +94,24 @@ class Trace:
 # --- skip signal ------------------------------------------------------------
 
 class AgentUnavailable(Exception):
-    """Raised when a live agent cannot run (SDK not installed, key unset).
+    """Raised when a live agent cannot run (SDK not installed, key unset, or an
+    environment/credential problem like an invalid key / denied permission).
 
     Callers treat this as a *skip*, never a failure. It is deliberately NOT an
     ImportError so the unit test can distinguish "module imported fine, agent
     just can't run here" from "module failed to import".
+    """
+
+
+class ScenarioAPIError(Exception):
+    """Raised when a real API call fails for a *per-scenario* reason (rate
+    limit, transient 5xx, request-shape error) rather than an environment-wide
+    credential problem.
+
+    Distinct from AgentUnavailable on purpose: a credential/SDK problem means
+    the whole suite should SKIP, but a one-off API error should be reported as
+    THAT scenario's failure without aborting the rest of the report — and must
+    NEVER be swallowed into a false pass.
     """
 
 
@@ -166,6 +179,20 @@ class LiveAnthropicAgent(Agent):
 
         client = anthropic.Anthropic(api_key=api_key)
 
+        # Resolve the SDK exception classes we care about *lazily and
+        # defensively*: getattr with a never-matching fallback so a missing
+        # attribute (older/newer SDK) can never cause a secondary crash in the
+        # `except` clauses below. AuthenticationError / PermissionDeniedError
+        # are environment/credential problems (whole-suite skip-worthy); the
+        # broader APIError covers per-scenario failures (rate limit, transient
+        # 5xx, bad request) that must surface — never be swallowed into a pass.
+        class _Never(Exception):
+            """Sentinel that never matches a real exception."""
+
+        auth_error = getattr(anthropic, "AuthenticationError", _Never)
+        perm_error = getattr(anthropic, "PermissionDeniedError", _Never)
+        api_error = getattr(anthropic, "APIError", _Never)
+
         # Translate our tool registry into the Anthropic tool schema.
         tool_schemas = [tools[name]["schema"] for name in tools]
 
@@ -175,13 +202,27 @@ class LiveAnthropicAgent(Agent):
         ]
 
         for _step in range(max_steps):
-            resp = client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=system_prompt,
-                tools=tool_schemas,
-                messages=messages,
-            )
+            try:
+                resp = client.messages.create(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    system=system_prompt,
+                    tools=tool_schemas,
+                    messages=messages,
+                )
+            except (auth_error, perm_error) as exc:
+                # Invalid key / denied access == an environment problem. Skip,
+                # never a hard failure for an environment/credential problem.
+                raise AgentUnavailable(
+                    f"Anthropic credentials rejected ({type(exc).__name__}): {exc}"
+                ) from exc
+            except api_error as exc:
+                # Rate limit / transient 5xx / bad request for THIS scenario.
+                # Surface as a distinct, catchable error — do NOT swallow it
+                # into a false pass.
+                raise ScenarioAPIError(
+                    f"Anthropic API error ({type(exc).__name__}): {exc}"
+                ) from exc
 
             # Record any assistant text emitted this turn (the last one wins as
             # final_text once the loop ends without further tool use).
