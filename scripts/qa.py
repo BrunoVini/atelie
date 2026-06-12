@@ -250,16 +250,36 @@ if __name__ == "__main__":
               "[--widths a,b,c] [--kind page|animation] [--register brand|product] [--hook] [--json]")
         sys.exit(2)
     target = args[0]
-    contract = args[args.index("--contract") + 1] if "--contract" in args else None
-    widths = args[args.index("--widths") + 1] if "--widths" in args else DEFAULT_WIDTHS
-    kind = args[args.index("--kind") + 1] if "--kind" in args else None   # page|animation (else auto)
-    register = args[args.index("--register") + 1] if "--register" in args else None   # overrides the contract's
+    # All value-taking flags route through check.py's shared _flag_value so a flag
+    # given as the last arg with no value yields a clean `::error::` + exit 2 instead
+    # of an IndexError traceback (mirrors check.py's CLI; one helper, not two).
+    from check import _flag_value, _MISSING
+    contract = _flag_value(args, "--contract", None)
+    widths = _flag_value(args, "--widths", DEFAULT_WIDTHS)
+    kind = _flag_value(args, "--kind", None)        # page|animation (else auto)
+    register = _flag_value(args, "--register", None)  # overrides the contract's
+    if _MISSING in (contract, widths, kind, register):
+        sys.exit(2)
     hook = "--hook" in args
-    results = _battery(target, contract, widths, hook, kind=kind, register=register)
-    if "--json" in args:
-        print(json.dumps([r._asdict() for r in results], indent=2))
-    else:
-        print(format_evidence(target, contract, results))
-    if hook:
-        sys.exit(hook_exit_code(results))
-    sys.exit(1 if verdict(results) == "FAIL" else 0)
+    # Everything past arg-parse runs the battery and prints. If ANYTHING here raises
+    # (a non-UTF-8 / unreadable HTML target, a broken import, a garbled render result),
+    # Python's default uncaught exit code is 1 — which the Stop hook maps to BLOCK. That
+    # would make a checker that merely CRASHED block the agent (and embed a raw traceback
+    # as the block reason), violating the gate's own "a crash never blocks" discipline.
+    # So we collapse any unhandled exception to exit 2 ("could-not-verify" — the hook
+    # treats it as non-blocking), reserving exit 1 for a GENUINE FAIL verdict only. Usage
+    # errors above still exit 2 as before.
+    try:
+        results = _battery(target, contract, widths, hook, kind=kind, register=register)
+        if "--json" in args:
+            print(json.dumps([r._asdict() for r in results], indent=2))
+        else:
+            print(format_evidence(target, contract, results))
+        if hook:
+            sys.exit(hook_exit_code(results))
+        sys.exit(1 if verdict(results) == "FAIL" else 0)
+    except SystemExit:
+        raise   # a deliberate sys.exit (FAIL=1, could-not-verify=3, clean=0) is not a crash
+    except Exception as e:
+        print(f"::error:: qa could not verify {target}: {e}", file=sys.stderr)
+        sys.exit(2)

@@ -1,5 +1,12 @@
 """Tests for the qa.py single-entry battery (C1)."""
+import os
+import subprocess
+import sys
+
 from qa import CheckResult, verdict, format_evidence, _slop, _contrast
+
+_QA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   "scripts", "qa.py")
 
 
 def test_verdict_fails_only_on_gating_failure():
@@ -107,3 +114,32 @@ def test_safe_static_is_unknown_without_a_contract(tmp_path):
     from qa import _safe_static
     res = _safe_static(str(tmp_path), str(tmp_path))   # no design-tokens.json / DESIGN.md here
     assert any(r.name == "overlap-risk" and r.status == "unknown" for r in res)
+
+
+def test_trailing_valueless_contract_exits_2_no_traceback(tmp_path):
+    # Regression: a value-taking flag given as the last arg with no value used to
+    # IndexError. It must now print a clean ::error:: and exit 2 — no traceback.
+    page = tmp_path / "p.html"
+    page.write_text("<!doctype html><html><body><h1>x</h1></body></html>")
+    r = subprocess.run([sys.executable, _QA, str(page), "--contract"],
+                       text=True, capture_output=True, timeout=60)
+    assert r.returncode == 2
+    assert "--contract requires a value" in r.stdout
+    assert "Traceback" not in r.stderr   # no IndexError traceback
+
+
+def test_non_utf8_html_exits_2_not_1_no_traceback(tmp_path):
+    # Regression: qa.py used to read the target with open(...).read() — a non-UTF-8
+    # HTML file raised UnicodeDecodeError, and Python's default uncaught exit code (1)
+    # is exactly what the Stop hook maps to BLOCK. A checker that merely CRASHED must
+    # NOT block: an unhandled exception must collapse to the could-not-verify code 2
+    # (a clean ::error:: to stderr), reserving exit 1 for a GENUINE FAIL verdict only.
+    page = tmp_path / "bad.html"
+    page.write_bytes(b"<!doctype html><html><body><h1>\xff\xfe not utf-8</h1></body></html>")
+    r = subprocess.run([sys.executable, _QA, str(page), "--hook"],
+                       text=True, capture_output=True, timeout=120)
+    assert r.returncode != 1, (
+        f"a crash must not exit 1 (the hook's BLOCK code); got {r.returncode}\n{r.stderr}")
+    assert r.returncode == 2          # could-not-verify -> the hook treats it as non-blocking
+    assert "::error:: qa could not verify" in r.stderr
+    assert "Traceback" not in r.stdout   # no raw traceback embedded in stdout
