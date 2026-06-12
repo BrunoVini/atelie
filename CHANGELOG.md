@@ -270,7 +270,7 @@ of this initial pre-release; nothing has shipped under a version tag yet.
 - Second-order anti-sameness (`references/knowledge/reflex-reject.csv` + design-philosophy):
   catches the *predictable* "safe" choice for a product category (every fintech →
   emerald + serif display) on top of the obvious AI tells, wired into `cold_start_ledger.py`.
-- Defensive CSS (defensivecss.dev, Ahmad Shadeed): all 25 techniques cataloged
+- Defensive CSS: 25 techniques cataloged
   (`references/knowledge/defensive-css.csv`) with a guide, and the cleanly static, low-false-
   positive ones shipped as rules — iOS input-zoom (`font-size<16px` on text controls, gating),
   image overflow, background-repeat — disciplined to catalog FP-prone tips as judgment, not
