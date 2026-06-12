@@ -206,6 +206,79 @@ def gate_failures(rows):
     return [r for r in rows if not r["informational"] and not r["passes"]]
 
 
+# ---------------------------------------------------------------------------
+# RENDERED contrast: measure ACTUAL painted text/background pairs at their ACTUAL
+# size. The token-pair audit() above pairs colors by NAME heuristics — it can flag
+# pairs never used together (false positives) and miss text whose color isn't a token,
+# sits on a gradient/image, or has a size that flips the threshold. audit_pairs() takes
+# EXPLICIT measured pairs from contrast_rendered.mjs and grades each against the WCAG
+# threshold appropriate for its real size. Pure: no contract, no name heuristics.
+# ---------------------------------------------------------------------------
+
+# WCAG "large text" = >= 24px, OR bold (font-weight >= 700, per SC 1.4.3) and >= 18.66px
+# (≈ 14pt bold). Large text only needs AA-large (3:1); everything else needs AA-normal (4.5:1).
+# The bold classification (weight >= 700) happens at capture time (contrast_rendered.mjs);
+# audit_pairs receives the resolved `bold` flag and only applies the size threshold here.
+LARGE_PX = 24.0
+LARGE_BOLD_PX = 18.66
+
+
+def _is_large(px, bold):
+    """WCAG large-text test from the ACTUAL rendered size."""
+    try:
+        p = float(px)
+    except (TypeError, ValueError):
+        return False
+    return p >= LARGE_PX or (bool(bold) and p >= LARGE_BOLD_PX)
+
+
+def audit_pairs(pairs, apca=False):
+    """Grade EXPLICIT measured text/bg pairs against their size-appropriate WCAG level.
+
+    Each input pair is a dict with at least `text` and `bg` hex strings, plus optional
+    `px` (float font-size), `bold` (bool), and pass-through context (`sample`, `selector`,
+    `bg_confident`, …). Returns rows in the same shape as audit() rows where it matters —
+    `ratio`, `required`, `passes` — preserving the input context so callers can surface the
+    offending text. Large text (>=24px, or bold >=18.66px) uses AA_LARGE (3.0); else
+    AA_NORMAL (4.5). A malformed/non-hex pair is SKIPPED (not fatal) — false data must not
+    invent a failure. With apca=True, also attaches `apca_lc` (the WCAG verdict is unchanged).
+    """
+    rows = []
+    for p in pairs or []:
+        if not isinstance(p, dict):
+            continue
+        text, bg = p.get("text"), p.get("bg")
+        try:
+            trgb, brgb = _hex_to_rgb(text), _hex_to_rgb(bg)
+        except (ValueError, TypeError, AttributeError):
+            continue   # non-hex / malformed -> skip, never gate on garbage
+        px, bold = p.get("px"), p.get("bold", False)
+        large = _is_large(px, bold)
+        required = AA_LARGE if large else AA_NORMAL
+        ratio = round(contrast_ratio(trgb, brgb), 2)
+        row = {
+            "text": text, "bg": bg, "px": px, "bold": bool(bold),
+            "ratio": ratio, "required": required, "passes": ratio >= required,
+            "large": large,
+            "aa_normal": ratio >= AA_NORMAL, "aa_large": ratio >= AA_LARGE,
+            # carry rendered context through so the gate can name the offender
+            "sample": p.get("sample"), "selector": p.get("selector"),
+            "bg_confident": p.get("bg_confident", True),
+        }
+        if apca:
+            row["apca_lc"] = round(apca_lc(text, bg), 1)
+        rows.append(row)
+    return rows
+
+
+def rendered_gate_failures(rows):
+    """Measured pairs that FAIL their size-appropriate threshold AND are gate-eligible
+    (bg_confident). A pair whose effective background is indeterminate (gradient/image/
+    backdrop/alpha) is `bg_confident:false` and is NEVER gated — only solid-fg-on-solid-bg
+    pairs are real, measured failures. This is the FALSE-POSITIVE guard for the hook."""
+    return [r for r in rows if r.get("bg_confident", True) and not r["passes"]]
+
+
 def apca_gate_failures(rows, target=APCA_DEFAULT_TARGET):
     """OPT-IN APCA gate: enforced pairs whose abs(Lc) is below `target`. Independent of
     the WCAG gate — used only when APCA gating is explicitly opted into (contract
