@@ -80,19 +80,77 @@ def _a11y(html):
     )
 
 
-def _contrast(contract=None, colors=None):
-    from audit_contrast import audit, gate_failures, _load_colors
-    if colors is None:
-        try:
-            colors = _load_colors(contract)
-        except Exception as e:
-            return CheckResult("contrast", "unknown", True, {}, f"could not load contract: {e}")
-    fails = gate_failures(audit(colors))
+def _contrast(contract=None, colors=None, themes=None):
+    """Palette contrast gate over the contract's color tokens.
+
+    Audits BOTH the base/light palette AND the co-equal DARK palette (when the
+    contract ships one): a dark-only contrast failure must gate, not hide in prose.
+    The rendered layer (_contrast_rendered) only paints the default/light theme, so
+    the dark palette is the ONLY gate dark-mode contrast ever gets in qa full mode.
+
+    `colors=` (a single {name: hex}) is the direct-palette path used by tests and the
+    `colors` shortcut — treated as the base theme. `themes=` overrides resolution with
+    an explicit {"base": {...}, "dark": {...}}. Otherwise both themes are resolved from
+    the contract via load_themed_colors."""
+    from audit_contrast import audit, gate_failures, load_themed_colors
+    if themes is None:
+        if colors is not None:
+            themes = {"base": colors}
+        else:
+            try:
+                themes = load_themed_colors(contract)
+            except Exception as e:
+                return CheckResult("contrast", "unknown", True, {}, f"could not load contract: {e}")
+    by_theme = {name: gate_failures(audit(cols)) for name, cols in themes.items()}
+    total = sum(len(f) for f in by_theme.values())
+    detail = "; ".join(
+        f"[{name}] {r['text']} on {r['surface']} {r['ratio']}:1"
+        for name, fails in by_theme.items() for r in fails) or "clean"
     return CheckResult(
-        "contrast", "fail" if fails else "pass", True,
-        {"aa_fails": len(fails)},
-        "; ".join(f"{r['text']} on {r['surface']} {r['ratio']}:1" for r in fails) or "clean",
+        "contrast", "fail" if total else "pass", True,
+        {"aa_fails": total}, detail,
     )
+
+
+def _contrast_rendered(path):
+    """RENDERED element-level contrast: run contrast_rendered.mjs, measure the ACTUAL
+    painted text/bg pairs at their ACTUAL size, and GATE only on `bg_confident` pairs that
+    FAIL their size-appropriate WCAG threshold (real, measured failures). This closes the
+    token-pair audit's gaps (false-positive name-pairs; missed non-token / on-gradient text)
+    WITHOUT introducing new false positives: a pair whose effective background is
+    indeterminate (gradient/image/backdrop/alpha) is bg_confident:false and NEVER gates.
+
+    No browser (exit 3) / crash / no parseable pairs -> `unknown` (never gates) — the
+    palette _contrast(contract) is the fallback, per the don't-trust-a-null contract.
+    The palette gate covers BOTH the base/light and DARK theme tokens; this rendered
+    layer measures only the PAINTED (light) theme. When both run, only the base palette
+    is demoted to advisory (it was measured); the DARK palette stays gating (see _battery)."""
+    code, log = _run(["node", os.path.join(HERE, "contrast_rendered.mjs"), path, "--json"])
+    if code == 3 or "no headless browser" in log:
+        return CheckResult("contrast-rendered", "unknown", True, {},
+                           "no headless browser — not trusted, did not gate")
+    crashed = "contrast_rendered failed:" in log
+    if code != 0 or crashed:
+        return CheckResult("contrast-rendered", "unknown", True, {}, "(checker crashed; not trusted)")
+    try:
+        data = json.loads(log[log.index("{"):log.rindex("}") + 1])
+    except Exception:
+        return CheckResult("contrast-rendered", "unknown", True, {},
+                           "(contrast_rendered returned no parseable json; not trusted)")
+    pairs = data.get("pairs") or []
+    if not pairs:
+        return CheckResult("contrast-rendered", "unknown", True, {},
+                           "no painted text pairs measured — not trusted, did not gate")
+    from audit_contrast import audit_pairs, rendered_gate_failures
+    rows = audit_pairs(pairs)
+    fails = rendered_gate_failures(rows)
+    eligible = [r for r in rows if r.get("bg_confident", True)]
+    detail = "; ".join(
+        f"{r['sample'] or r['selector']!r} {r['text']} on {r['bg']} {r['ratio']}:1 "
+        f"(needs {r['required']:g})" for r in fails) or "clean"
+    return CheckResult(
+        "contrast-rendered", "fail" if fails else "pass", True,
+        {"measured": len(eligible), "fails": len(fails)}, detail)
 
 
 def format_evidence(target, contract, results):
@@ -287,10 +345,53 @@ def _battery(target, contract, widths, hook, kind=None, register=None):
         # with no alt, an unnamed icon control, an unlabeled input) gate the verdict
         # and the bound Stop hook — a page nobody can use should never read "done".
         results.append(_a11y(html))
+        # RENDERED element-level contrast: measures the ACTUAL painted text/bg pairs and
+        # gates only on bg_confident, size-graded failures (no contract needed). Prefer it
+        # when a browser is available; it self-reports `unknown` (never gates) without one.
+        rc = _contrast_rendered(target)
+        results.append(rc)
         if not hook:                                  # full-mode-only layer (needs a contract)
             if contract:
-                results.append(_contrast(contract=contract))
-        elif all(r.status == "unknown" for r in rendered if r.gating):
+                # The palette gate covers BOTH theme palettes: base/light tokens AND the
+                # contract's co-equal DARK palette. The rendered layer measures only the
+                # PAINTED (light) theme, so when it produced a real verdict (a browser ran:
+                # pass/fail) the rendered measurement is the authority for the light theme —
+                # demote ONLY the base palette pairs to a NON-GATING advisory so the same wall
+                # doesn't gate twice. The DARK palette stays GATING: the rendered layer can't
+                # see the dark theme, so the dark palette audit is its only gate. Without a
+                # browser (rendered == unknown) the FULL palette (base + dark) stays gating.
+                from audit_contrast import load_themed_colors
+                rendered_decided = rc.status in ("pass", "fail")
+                try:
+                    themes = load_themed_colors(contract)
+                except Exception as e:
+                    results.append(CheckResult("contrast", "unknown", True, {},
+                                               f"could not load contract: {e}"))
+                    themes = None
+                if themes is not None and rendered_decided:
+                    base = {k: v for k, v in themes.items() if k == "base"}
+                    dark = {k: v for k, v in themes.items() if k != "base"}
+                    if base:
+                        results.append(_contrast(themes=base)._replace(gating=False))
+                    if dark:
+                        # dark stays GATING — rendered can't see the dark theme.
+                        results.append(_contrast(themes=dark)._replace(name="contrast-dark"))
+                elif themes is not None:
+                    results.append(_contrast(themes=themes))      # full palette gates (no browser)
+        elif contract:
+            # hook mode: the rendered layer (when a browser ran) covers the PAINTED light
+            # theme, so we don't add the base palette gate here. But the DARK palette is
+            # NEVER painted/measured — without a gate it would be ungated in --hook. Gate
+            # the dark palette (only) so a dark-mode contrast failure blocks "done" too.
+            from audit_contrast import load_themed_colors
+            try:
+                themes = load_themed_colors(contract)
+            except Exception:
+                themes = None
+            if themes and themes.get("dark"):
+                results.append(
+                    _contrast(themes={"dark": themes["dark"]})._replace(name="contrast-dark"))
+        if hook and all(r.status == "unknown" for r in rendered if r.gating):
             # hook + no browser — fall back to the static overlap lint on the file's dir.
             # Only the GATING rendered checks decide this (focus_order is a non-gating
             # advisory; whether it ran or not shouldn't suppress the static fallback).

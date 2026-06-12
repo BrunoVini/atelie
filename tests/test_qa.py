@@ -29,6 +29,24 @@ def test_contrast_flags_low_contrast_and_passes_high():
     assert ok.status == "pass"
 
 
+def test_contrast_audits_both_themes_and_gates_dark_failure():
+    # The palette gate covers BOTH theme palettes. A clean light theme with a FAILING
+    # dark theme must still FAIL (dark-mode contrast was previously ungated in qa/check).
+    themes = {
+        "base": {"ink": "#111111", "paper": "#ffffff"},   # clean light
+        "dark": {"ink": "#777777", "paper": "#888888"},   # muddy fg on dark -> FAIL
+    }
+    r = _contrast(themes=themes)
+    assert r.status == "fail" and r.counts["aa_fails"] >= 1
+    assert "[dark]" in r.detail        # the dark failure is surfaced clearly
+    # a passing dark palette + passing light palette -> pass
+    ok = _contrast(themes={
+        "base": {"ink": "#111111", "paper": "#ffffff"},
+        "dark": {"ink": "#eeeeee", "paper": "#111111"},
+    })
+    assert ok.status == "pass"
+
+
 def test_evidence_block_has_markers_target_and_verdict():
     ev = format_evidence("page.html", None, [CheckResult("slop", "pass", True, {"important": 0}, "clean")])
     assert "=== atelier qa evidence ===" in ev

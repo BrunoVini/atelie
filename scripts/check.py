@@ -12,7 +12,7 @@ import os
 import sys
 
 from lint_design import lint_repo
-from audit_contrast import audit, gate_failures, _load_colors
+from audit_contrast import audit, gate_failures, load_themed_colors
 from check_rules import check as check_house_rules
 from overlap_risk import scan_repo_overlap_risk
 from a11y_check import scan_repo_a11y
@@ -40,9 +40,18 @@ def run(repo, contract, max_drift=0, allow_contrast_fail=False, max_overlap_risk
         results["steps"].append({"step": "design-lint", "skipped": True, "ok": True})
 
     if _on("contrast-audit"):
-        colors = _load_colors(contract)
-        # AA-normal (4.5:1) for body text, AA-large (3:1) only for heading roles.
-        fails = gate_failures(audit(colors))
+        # Audit BOTH theme palettes: the base/light tokens AND the contract's co-equal
+        # DARK palette when it ships one. A dark-only contrast failure must gate too —
+        # it was previously audited only by audit_contrast.py's standalone CLI, so the
+        # CI path never caught it. This only ADDS a gate when the contract HAS a dark
+        # palette (most don't, and are unaffected). AA-normal (4.5:1) for body text,
+        # AA-large (3:1) only for heading roles.
+        themes = load_themed_colors(contract)
+        fails = []
+        for tname, cols in themes.items():
+            for r in gate_failures(audit(cols)):
+                r = dict(r, theme=tname)
+                fails.append(r)
         contrast_ok = allow_contrast_fail or not fails
         results["steps"].append({"step": "contrast-audit", "fails": len(fails), "ok": contrast_ok})
         results["ok"] &= contrast_ok
@@ -94,11 +103,13 @@ def run(repo, contract, max_drift=0, allow_contrast_fail=False, max_overlap_risk
 
     results["a11y_findings"] = a11y
     results["drift"] = drift
-    results["contrast_fails"] = [f"{r['text']} on {r['surface']} ({r['ratio']}:1)" for r in fails]
+    results["contrast_fails"] = [
+        f"[{r.get('theme', 'base')}] {r['text']} on {r['surface']} ({r['ratio']}:1)" for r in fails]
     # Additive structured contrast detail for SARIF/tooling consumers. Existing
-    # keys are unchanged; this is new and purely additive.
+    # keys are unchanged; `theme` is new and purely additive.
     results["contrast_fails_detail"] = [
-        {"text": r["text"], "surface": r["surface"], "ratio": r["ratio"]} for r in fails
+        {"text": r["text"], "surface": r["surface"], "ratio": r["ratio"],
+         "theme": r.get("theme", "base")} for r in fails
     ]
     results["rule_violations"] = rule_violations
     results["overlap_risks"] = overlaps
