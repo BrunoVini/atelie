@@ -5,6 +5,19 @@
 
 ---
 
+## Core Asset step (run first)
+
+Before building a launch film / brand piece, acquire the REAL brand assets —
+never fabricate a logo. Run the Core Asset Protocol
+(`references/capabilities/core-assets.md`): `python3 scripts/core_assets.py --url
+<site>` harvests the real logo + product shots into a frozen manifest, and
+`python3 scripts/import_reference.py --deep <site>` captures how the site moves
+(scroll journey + hover/focus). If a required asset is missing, the manifest
+freezes a documented fallback to use **and flag** — a near-miss logo reads as
+fake faster than anything else in the piece.
+
+---
+
 ## 0 · What this document solves
 
 When you need to make a "demo animation showing a workflow" (typical scenarios: skill workflows, product onboarding, API call flows, agent task execution), there are two common approaches:

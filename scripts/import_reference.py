@@ -8,6 +8,7 @@ Usage:
     python3 import_reference.py --image shot.png         # quantize dominant colors
     python3 import_reference.py --url https://example.com # crawl HTML + linked CSS
     python3 import_reference.py --url https://example.com --computed  # + browser pass
+    python3 import_reference.py --deep https://example.com [--out dir]  # scroll-journey + hover/focus states
     python3 import_reference.py --stitch path/DESIGN.md  # import a Google Stitch DESIGN.md
 
 Image mode decodes PNG in pure Python (8-bit truecolor / truecolor-alpha) and
@@ -15,9 +16,12 @@ clusters the dominant colors perceptually (reusing scan_repo's ΔE). URL mode is
 HTTP-first: it fetches the page and its linked stylesheets over plain HTTP and runs
 atelier's real extractors over all of it (colors / fonts / shadows / gradients /
 radius / spacing / breakpoints) — no browser required. `--computed` adds an optional
-headless-browser pass for accurate background/accent computed values.
+headless-browser pass for accurate background/accent computed values. `--deep` adds a
+behavioural capture (scroll-journey screenshots + hover/focus state diffs) via
+capture_deep.mjs, so the agent learns how the page MOVES, not just how it looks.
 """
 import json
+import os
 import re
 import struct
 import subprocess
@@ -177,6 +181,34 @@ def crawl_url(url, max_css=12):
     return {"css_files_fetched": fetched, **styles_from_blob(html, "\n".join(css_texts))}
 
 
+_DEEP_MJS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "capture_deep.mjs")
+
+
+def deep_capture(target, out_dir):
+    """Shell capture_deep.mjs for a behavioural capture of `target` (url or file).
+
+    Returns (status, payload):
+      ("ok", manifest_dict) on success;
+      ("no_browser", None)  on the exit-3 contract (headless browser missing);
+      ("error", message)    on usage/run failure or missing node.
+    """
+    try:
+        out = subprocess.run(["node", _DEEP_MJS, target, out_dir],
+                             capture_output=True, text=True, timeout=180)
+    except FileNotFoundError:
+        return "error", "node not found — install Node + playwright for --deep"
+    except subprocess.TimeoutExpired:
+        return "error", "capture_deep timed out"
+    if out.returncode == 3:
+        return "no_browser", None
+    if out.returncode != 0:
+        return "error", (out.stderr.strip() or f"capture_deep exited {out.returncode}")
+    try:
+        return "ok", json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return "error", "capture_deep produced no manifest"
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if "--stitch" in args:
@@ -192,6 +224,31 @@ if __name__ == "__main__":
         colors = colors_from_image(path)
         print(json.dumps({"source": path, "dominant_colors": colors}, indent=2))
         print("\nNext: assign roles (primary/accent/bg/fg) and feed into generate-design-md.", file=sys.stderr)
+    elif "--deep" in args:
+        target = args[args.index("--deep") + 1]
+        out_dir = args[args.index("--out") + 1] if "--out" in args else "reference-deep"
+        is_url = bool(re.match(r"^https?://", target))
+        report = {"source": target, "out_dir": os.path.abspath(out_dir)}
+        if is_url:                                  # fold in the measured styles too
+            report["measured"] = crawl_url(target)
+        status, payload = deep_capture(target, out_dir)
+        if status == "no_browser":
+            report["deep"] = {"ok": False, "reason": "no headless browser"}
+            print(json.dumps(report, indent=2))
+            print("\n--deep needs a headless browser (the scroll-journey + hover/focus capture "
+                  "renders the page). Install one: npm i -D playwright && npx playwright install "
+                  "chromium  (or point ATELIER_CHROME at a Chrome/Chromium binary). The measured "
+                  "styles above still apply.", file=sys.stderr)
+        elif status == "error":
+            report["deep"] = {"ok": False, "error": payload}
+            print(json.dumps(report, indent=2))
+            print(f"\n--deep capture failed: {payload}", file=sys.stderr)
+        else:
+            report["deep"] = payload
+            print(json.dumps(report, indent=2))
+            print(f"\nWrote scroll-journey screenshots to {os.path.abspath(out_dir)}. "
+                  "Use the hover/focus state diffs to reproduce the site's interaction feel "
+                  "(animated buttons / focus rings) instead of guessing.", file=sys.stderr)
     elif "--url" in args:
         url = args[args.index("--url") + 1]
         report = {"source": url, "measured": crawl_url(url)}   # HTTP-first, no browser
@@ -204,5 +261,6 @@ if __name__ == "__main__":
               "Add --computed for a headless-browser computed-style pass (needs playwright).",
               file=sys.stderr)
     else:
-        print("usage: import_reference.py --image <png> | --url <url> [--computed] | --stitch <DESIGN.md>")
+        print("usage: import_reference.py --image <png> | --url <url> [--computed] | "
+              "--deep <url-or-file> [--out <dir>] | --stitch <DESIGN.md>")
         sys.exit(2)
