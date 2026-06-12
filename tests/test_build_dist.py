@@ -190,8 +190,18 @@ def test_cursor_ports_commands(tmp_path):
         # and the script path is rewritten to the cursor skill install path.
         assert "$ARGUMENTS" not in text
         assert "${CLAUDE_PLUGIN_ROOT}" not in text
+        # The shell-quoted argument must NOT become a prose sentence fragment —
+        # `script.py "the target you specify"` is a broken literal an agent could
+        # run verbatim. It must be a fill-in slot instead.
+        assert '"the target you specify"' not in text, (
+            f"{name}: prose fragment leaked into a shell-quoted argument")
+        if '.py "' in text or '.sh "' in text:
+            assert '"<target>"' in text, (
+                f"{name}: shell invocation must use the <target> fill-in slot")
     assert ".cursor/skills/atelier/scripts/" in _read(
         os.path.join(base, "atelier-review.md"))
+    # The check command runs check.py against a quoted target slot, not prose.
+    assert 'check.py "<target>"' in _read(os.path.join(base, "atelier-check.md"))
 
 
 def test_gemini_ports_toml_commands(tmp_path):

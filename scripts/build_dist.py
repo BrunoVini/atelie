@@ -315,7 +315,7 @@ def _skill_install_path(cfg):
     return cfg["skill_root"].replace(os.sep, "/")
 
 
-def _rewrite_body(body, cfg, *, args_token, args_is_placeholder=True):
+def _rewrite_body(body, cfg, *, args_token, args_is_placeholder=True, shell_token="<target>"):
     """Rewrite a command body for a non-Claude harness.
 
     - ${CLAUDE_PLUGIN_ROOT}/  ->  <skill-install-path>/  (e.g. .agents/skills/atelier/)
@@ -324,16 +324,21 @@ def _rewrite_body(body, cfg, *, args_token, args_is_placeholder=True):
                                   e.g. Gemini {{args}}, Copilot ${input:target}).
 
     When `args_is_placeholder` is False the harness has no argument variable at all
-    (e.g. Cursor): the source wraps the token in backticks for emphasis, so we strip
-    the surrounding `` ` `` too and drop in plain prose rather than leaving dead
-    code-formatting around a non-token.
+    (e.g. Cursor): the source uses `$ARGUMENTS` in two contexts — backticked prose
+    (`` `$ARGUMENTS` ``) and shell-quoted inside a script invocation (`"$ARGUMENTS"`).
+    The prose form becomes plain prose (`args_token`), but the shell-quoted form must
+    NOT become a sentence fragment — `script.py "the target you specify"` would be a
+    broken literal the agent could run verbatim. It becomes a fill-in slot
+    (`shell_token`, e.g. `<target>`) so the command still reads as a real invocation.
     """
     body = body.replace("${CLAUDE_PLUGIN_ROOT}/", _skill_install_path(cfg) + "/")
     if args_token == "$ARGUMENTS":
         return body
     if args_is_placeholder:
         return body.replace("$ARGUMENTS", args_token)
-    # No placeholder: unwrap `$ARGUMENTS` (with its emphasis backticks) into prose.
+    # No placeholder. Order matters: rewrite the shell-quoted occurrence into a
+    # fill-in slot first, then the backticked prose form, then any bare residue.
+    body = body.replace('"$ARGUMENTS"', f'"{shell_token}"')
     body = body.replace("`$ARGUMENTS`", args_token)
     body = body.replace("$ARGUMENTS", args_token)
     return body
