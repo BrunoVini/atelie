@@ -10,6 +10,7 @@ resolve_contract(target) accepts a tokens.json path, a repo dir, or a DESIGN.md
 path and returns: {"source", "colors": {name: "#hex"}, "fonts": [..], "spacing": [..],
 "radius": [..], "depth", and optionally "elevation"}.
 """
+import copy
 import json
 import os
 import re
@@ -469,6 +470,20 @@ def _from_design_md_prose(text, path):
             "radius": [], "depth": depth}
 
 
+def _find_design_md_in(d):
+    """Path to a DESIGN.md in dir `d`, matched case-INSENSITIVELY (so a `design.md`
+    on a case-sensitive FS resolves), or None. Shared by resolve_contract's dir branch
+    and the monorepo detection so detection and resolution agree (no divergence where a
+    dir is flagged "has contract" then fails to resolve)."""
+    try:
+        for fn in os.listdir(d):
+            if fn.upper() == "DESIGN.MD":
+                return os.path.join(d, fn)
+    except OSError:
+        pass
+    return None
+
+
 def resolve_contract(target):
     """Resolve from a tokens.json path, a repo dir, or a DESIGN.md path."""
     if os.path.isfile(target):
@@ -480,8 +495,12 @@ def resolve_contract(target):
         tj = os.path.join(target, "design", "design-tokens.json")
         if os.path.exists(tj):
             return _from_tokens_json(tj)
-        dm = os.path.join(target, "DESIGN.md")
-        if os.path.exists(dm):
+        # DESIGN.md lookup is case-insensitive (matches _dir_has_contract / context's
+        # _find_design_md). The exact "DESIGN.md" name is returned byte-identically by
+        # the scan since os.listdir surfaces it verbatim — so the 647 existing tests,
+        # which all use "DESIGN.md", are unaffected.
+        dm = _find_design_md_in(target)
+        if dm is not None:
             return _from_design_md(dm)
     raise FileNotFoundError(
         f"no contract at {target} — need design/design-tokens.json or DESIGN.md "
@@ -494,6 +513,167 @@ def has_contract(target):
         return True
     except FileNotFoundError:
         return False
+
+
+# --- Monorepo: per-app DESIGN.md inheritance --------------------------------
+# A monorepo may carry a ROOT DESIGN.md (the base design system) and per-child-app
+# contracts (apps/web/DESIGN.md, …) that OVERRIDE/extend the root for that app.
+# resolve_contract_for_app(app_dir, repo_root) folds the chain rootmost→appmost with
+# merge_contracts (app wins). All additive: resolve_contract itself is untouched, and a
+# single-contract repo returns resolve_contract's exact dict (no inherits/chain keys).
+
+# Keys merged as {key: value} dicts (child entries win per-key, base entries retained).
+_MERGE_DICT_KEYS = ("colors", "dark_colors", "typography", "components", "contrast")
+# List keys where a non-empty child REPLACES the base list wholesale (else inherit base).
+_MERGE_LIST_KEYS = ("fonts", "spacing", "radius")
+# Scalar keys where a present (not-None) child value overrides the base.
+_MERGE_SCALAR_KEYS = ("register", "depth", "elevation", "apca_target", "source_format")
+
+
+def merge_contracts(base, child):
+    """Pure overlay of `child` onto `base`, returning a NEW contract (neither mutated).
+
+    - dict keys (colors/dark_colors/typography/components/contrast): per-key merge,
+      child wins; base-only keys retained.
+    - list keys (fonts/spacing/radius): child REPLACES base when child is non-empty;
+      otherwise inherit base.
+    - scalar keys (register/depth/elevation/apca_target/source_format): child overrides
+      when present (not None), else base.
+    - source = child's source (the most-specific file).
+    - machine_block_dropped: concatenated (base + child).
+    - records `inherits` provenance: {base_source, overrides:[keys the child set]}.
+
+    Defensive: either side may be missing any key (treated as absent)."""
+    base = base or {}
+    child = child or {}
+    out = {}
+    overrides = set()
+
+    for key in _MERGE_DICT_KEYS:
+        b = base.get(key) if isinstance(base.get(key), dict) else {}
+        c = child.get(key) if isinstance(child.get(key), dict) else {}
+        if not b and not c:
+            continue
+        # deepcopy each side: a shallow dict()/update() would alias nested objects
+        # (e.g. a typography role dict, a component spec) by reference with base/child,
+        # so mutating the merged result would mutate the inputs — violating the
+        # "neither mutated / returns a NEW contract" contract.
+        merged = copy.deepcopy(b)
+        merged.update(copy.deepcopy(c))
+        out[key] = merged
+        if c:
+            overrides.add(key)
+
+    for key in _MERGE_LIST_KEYS:
+        b = base.get(key) if isinstance(base.get(key), list) else []
+        c = child.get(key) if isinstance(child.get(key), list) else []
+        if c:
+            out[key] = list(c)
+            overrides.add(key)
+        elif b or key in base:
+            out[key] = list(b)
+
+    for key in _MERGE_SCALAR_KEYS:
+        cv = child.get(key)
+        if cv is not None:
+            out[key] = cv
+            if cv != base.get(key):
+                overrides.add(key)
+        elif key in base:
+            out[key] = base.get(key)
+
+    # source = the most-specific (child) file; fall back to base if child has none.
+    out["source"] = child.get("source") or base.get("source")
+
+    dropped = list(base.get("machine_block_dropped") or []) + \
+        list(child.get("machine_block_dropped") or [])
+    if dropped:
+        out["machine_block_dropped"] = dropped
+
+    # Carry through any other base keys the child didn't touch (defensive, additive),
+    # without clobbering what we already merged (e.g. machine_block status flags).
+    for key, val in base.items():
+        if key in out or key in ("inherits", "chain", "machine_block_dropped"):
+            continue
+        out[key] = copy.deepcopy(val)
+    for key, val in child.items():
+        if key in out or key in ("inherits", "chain"):
+            continue
+        out[key] = copy.deepcopy(val)
+        overrides.add(key)
+
+    out["inherits"] = {"base_source": base.get("source"),
+                       "overrides": sorted(overrides)}
+    return out
+
+
+def _dir_has_contract(d):
+    """True if dir `d` holds a contract: a DESIGN.md (case-insensitive, via the same
+    shared helper resolve_contract's dir branch uses) OR design/design-tokens.json."""
+    if _find_design_md_in(d) is not None:
+        return True
+    return os.path.isfile(os.path.join(d, "design", "design-tokens.json"))
+
+
+def resolve_contract_for_app(app_dir, repo_root=None):
+    """Resolve an app's contract with monorepo inheritance: fold every contract from
+    `repo_root` down to `app_dir` (rootmost→appmost), child wins.
+
+    - repo_root defaults to app_dir; if given it MUST be an ancestor of app_dir.
+    - Walks parent-by-parent from app_dir up to and INCLUDING repo_root, collecting
+      dirs that HAVE a contract (DESIGN.md case-insensitive OR design/design-tokens.json).
+    - 0 contracts: FileNotFoundError (same message style as resolve_contract).
+    - exactly 1: resolve_contract(<that dir>) UNCHANGED (no inherits/chain — no regress).
+    - 2+: fold-left merge_contracts over resolve_contract of each; the result carries
+      `inherits` provenance and a `chain` of source paths (rootmost→appmost)."""
+    # realpath (not just abspath) resolves symlinks, mirroring live-proxy's isConfined,
+    # so a symlinked app dir can't slip the confinement check below.
+    app_dir = os.path.realpath(app_dir)
+    root = os.path.realpath(repo_root) if repo_root else app_dir
+
+    # SECURITY: confine app_dir within repo_root. Without this, an app_dir that is NOT a
+    # descendant of repo_root (a `../..` traversal or an absolute path elsewhere) would let
+    # the up-walk below run all the way to `/`, resolving — and leaking — any DESIGN.md it
+    # finds on disk. When repo_root is given, app_dir MUST stay inside it.
+    if repo_root and app_dir != root:
+        try:
+            inside = os.path.commonpath([app_dir, root]) == root
+        except ValueError:
+            # commonpath raises on mixed abs/rel or different drives — treat as outside.
+            inside = False
+        if not inside:
+            raise FileNotFoundError(
+                f"app dir {app_dir} is outside repo root {root}")
+
+    # Collect the dirs along app_dir → root (appmost first), guarding against a
+    # repo_root that isn't an ancestor or a runaway walk.
+    chain_dirs = []
+    cur = app_dir
+    while True:
+        if _dir_has_contract(cur):
+            chain_dirs.append(cur)
+        if cur == root:
+            break
+        parent = os.path.dirname(cur)
+        if parent == cur:  # filesystem root reached without hitting repo_root
+            break
+        cur = parent
+    chain_dirs.reverse()  # rootmost → appmost
+
+    if not chain_dirs:
+        raise FileNotFoundError(
+            f"no contract at {app_dir} — need design/design-tokens.json or DESIGN.md "
+            "(run generate-design-md first)")
+
+    if len(chain_dirs) == 1:
+        return resolve_contract(chain_dirs[0])
+
+    contracts = [resolve_contract(d) for d in chain_dirs]
+    merged = contracts[0]
+    for nxt in contracts[1:]:
+        merged = merge_contracts(merged, nxt)
+    merged["chain"] = [c.get("source") for c in contracts]
+    return merged
 
 
 # `{group.name}` token references in DESIGN.md prose bind the human half to the

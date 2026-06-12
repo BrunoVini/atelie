@@ -6,8 +6,10 @@
 // (capabilities/live-mode.md). Non-HTML (assets, JSON, HMR) passes through untouched.
 //
 //   node live-proxy.cjs --upstream http://localhost:5173 --port <freeport> \
-//       [--project-dir <repo>] [--journal-dir <dir>] [--inject-only]
+//       [--project-dir <repo>] [--app <subdir>] [--journal-dir <dir>] [--inject-only]
 //
+// --app scopes variants to a monorepo app's inherited DESIGN.md (per-app override of
+// the root contract); omit it for a single-contract repo.
 // WebSocket / HMR: Vite & Next push hot updates over a ws upgrade. We tunnel the upgrade
 // transparently (raw socket pipe) so HMR keeps working through the proxy. Tunneling is
 // best-effort; if it fails the injected client degrades (no auto-reattach beyond the
@@ -129,6 +131,7 @@ function parseArgs(argv) {
     else if (a === '--port') out.port = Number(argv[++i]);
     else if (a === '--host') out.host = argv[++i];
     else if (a === '--project-dir') out.projectDir = argv[++i];
+    else if (a === '--app') out.app = argv[++i];
     else if (a === '--journal-dir') out.journalDir = argv[++i];
     else if (a === '--token') out.token = argv[++i];
     else if (a === '--inject-only') out.injectOnly = true;
@@ -163,6 +166,19 @@ function isConfined(file, projectDir) {
   return target === root || target.indexOf(root + path.sep) === 0;
 }
 
+// SECURITY: a monorepo `--app` value must be a RELATIVE subdir that stays WITHIN the
+// project (resolved against projectDir, symlink-aware via isConfined). An absolute path
+// or a `../` traversal would let the Python resolver walk to an arbitrary on-disk
+// DESIGN.md, so we DROP the app (the caller then uses the plain project contract).
+// Returns the app string when safe, or '' when it must be dropped. Exported for tests.
+function safeApp(app, projectDir) {
+  if (!app || typeof app !== 'string') return '';
+  if (!projectDir) return '';                       // no confinement root -> drop
+  if (path.isAbsolute(app)) return '';              // absolute app -> drop
+  const appDir = path.resolve(projectDir, app);
+  return isConfined(appDir, projectDir) ? app : '';
+}
+
 function handleControl(req, res, opts) {
   const scriptsDir = path.resolve(__dirname, '..');
   const journalDir = opts.journalDir || path.join(require('os').tmpdir(), 'atelier-live', 'journal');
@@ -190,6 +206,13 @@ function handleControl(req, res, opts) {
       if (!contract) { res.writeHead(400); return res.end('{"ok":false,"reason":"no contract — start with --project-dir or pass contract"}'); }
       const args = [path.join(scriptsDir, 'edit_apply.py'), 'variants', '--mode', mode,
                     '--contract', contract, '--current', JSON.stringify(p.current || {}), '--n', String(p.n || 3)];
+      // Monorepo: scope variants to the ACTIVE app's inherited DESIGN.md when --app is
+      // set (proxy flag) or passed per-request. Additive — absent => plain contract.
+      // safeApp confines the value to projectDir (relative, no `../`/abs escape); an
+      // escaping app is dropped so resolution can't leak an off-project contract.
+      const rawApp = p.app ? String(p.app) : (opts.app ? String(opts.app) : '');
+      const app = safeApp(rawApp, opts.projectDir);
+      if (app) args.push('--app', app);
       if (p.prop) args.push('--prop', String(p.prop));
       shellPython(args, (out) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(out); }, 15000);
     });
@@ -354,7 +377,7 @@ function makeServer(opts) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (!opts.upstream) {
-    console.error('usage: node live-proxy.cjs --upstream http://localhost:5173 --port <freeport> [--project-dir <repo>] [--journal-dir <dir>] [--inject-only]');
+    console.error('usage: node live-proxy.cjs --upstream http://localhost:5173 --port <freeport> [--project-dir <repo>] [--app <subdir>] [--journal-dir <dir>] [--inject-only]');
     process.exit(2);
   }
   const port = opts.port || (49152 + Math.floor(Math.random() * 16383));
@@ -377,5 +400,5 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { inject, isHtml, shouldInject, isConfined, parseArgs, makeServer,
+module.exports = { inject, isHtml, shouldInject, isConfined, safeApp, parseArgs, makeServer,
                    INJECTION, buildInjection, isAllowedHost, tokenOk };

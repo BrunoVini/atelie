@@ -120,6 +120,17 @@ The injected client is **idempotent** (HMR can re-inject the script) and fully
 defensive: every entry point is wrapped so a failure in atelier's client can never break
 the user's app — atelier is a guest in that page.
 
+## Monorepo: scope to the active app's contract
+
+In a monorepo, live-mode scopes to the **active app's inherited contract**. Pass
+`--app <subdir>` to the proxy (or `app` in a `/__atelier/variants` request body) and the
+variant engine resolves the contract via `contract.resolve_contract_for_app(app_dir,
+repo_root=projectDir)` — folding the root `DESIGN.md` base with the app's per-app
+`DESIGN.md` override (app wins; see design-md-spec.md §Monorepo). Without `--app`, or for
+a single-contract repo, resolution is byte-identical to plain `resolve_contract`, so
+nothing regresses. This keeps the picker → variant loop bound to exactly the contract the
+app you're editing answers to.
+
 ## Safety summary
 
 - **No config changes, no project-file writes** except the guarded accept.

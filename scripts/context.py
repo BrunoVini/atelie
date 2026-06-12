@@ -27,7 +27,8 @@ import json
 import os
 import sys
 
-from contract import resolve_contract, validate_contract
+from contract import (resolve_contract, validate_contract,
+                      resolve_contract_for_app)
 from scan_repo import detect_token_source, detect_framework, _SKIP_DIRS, _STYLE_EXT
 
 # What "design signals" means for the gate: any styling surface that could
@@ -65,6 +66,21 @@ def _detect_framework(repo_dir):
     return None if fw == "unknown" else fw
 
 
+def _find_design_md_files(repo_dir):
+    """All DESIGN.md files (case-insensitive) in the repo, skipping _SKIP_DIRS.
+    Cheap + defensive: used for monorepo detection (root + per-app contracts)."""
+    found = []
+    try:
+        for dirpath, dirnames, filenames in os.walk(repo_dir):
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+            for fn in filenames:
+                if fn.upper() == "DESIGN.MD":
+                    found.append(os.path.join(dirpath, fn))
+    except OSError:
+        pass
+    return sorted(found)
+
+
 def _has_style_files(repo_dir):
     """True if any stylesheet lives in the repo (a design signal even without a
     detected token source or framework)."""
@@ -76,9 +92,16 @@ def _has_style_files(repo_dir):
     return False
 
 
-def resolve_context(repo_dir):
+def resolve_context(repo_dir, app=None):
     """Return the step-0 context dict for `repo_dir`. Never raises on a missing/empty
-    dir — it yields nulls and a 'no contract' next step instead."""
+    dir — it yields nulls and a 'no contract' next step instead.
+
+    `app` (optional): a sub-directory of repo_dir naming the active app in a monorepo.
+    When given, the contract is resolved with per-app DESIGN.md inheritance
+    (resolve_contract_for_app) and the output gains `design_md_chain` + `inherits`;
+    register/contract_valid come from the MERGED contract. When `app` is None the
+    output is byte-identical to today (additive `design_md_files` only when a monorepo
+    with >1 DESIGN.md is detected)."""
     out = {
         "design_md": None, "contract_valid": None, "register": None,
         "token_source": None, "framework": None, "has_design_signals": False,
@@ -108,12 +131,30 @@ def resolve_context(repo_dir):
     # Contract: prefer DESIGN.md, but resolve_contract also handles design/tokens.json.
     design_md = _find_design_md(repo_dir)
     out["design_md"] = design_md
-    try:
-        contract = resolve_contract(repo_dir)
-    except FileNotFoundError:
-        contract = None
-    except Exception:
-        contract = None
+
+    # App scoping (additive): resolve the per-app inherited contract when --app names a
+    # sub-directory of repo_dir. Falls back to the plain repo resolution on any failure.
+    app_dir = None
+    if app:
+        app_dir = app if os.path.isabs(app) else os.path.join(repo_dir, app)
+
+    contract = None
+    if app_dir and os.path.isdir(app_dir):
+        try:
+            contract = resolve_contract_for_app(app_dir, repo_root=repo_dir)
+            if contract.get("chain"):
+                out["design_md_chain"] = contract.get("chain")
+            if contract.get("inherits"):
+                out["inherits"] = contract.get("inherits")
+        except Exception:
+            contract = None
+    if contract is None:
+        try:
+            contract = resolve_contract(repo_dir)
+        except FileNotFoundError:
+            contract = None
+        except Exception:
+            contract = None
 
     if contract is not None:
         ok, _rep = validate_contract(contract)
@@ -124,9 +165,35 @@ def resolve_context(repo_dir):
         out["next"] = "offer to generate DESIGN.md (signals present)"
     else:
         out["next"] = "no contract and no signals: capture a tone, note no contract"
+
+    # Monorepo detection (always, additive): only surfaces new keys when MORE THAN ONE
+    # DESIGN.md exists. With 0 or 1, behavior and `next` are unchanged.
+    design_md_files = _find_design_md_files(repo_dir)
+    if len(design_md_files) > 1:
+        out["design_md_files"] = design_md_files
+        if not app:
+            out["next"] = ("monorepo: multiple DESIGN.md found — pick an app "
+                           "(rerun with --app <subdir> for its inherited contract)")
     return out
 
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "."
-    print(json.dumps(resolve_context(target), indent=2))
+    # python3 context.py <repo_dir> [--app <app_subdir>]  (or a 2nd positional app)
+    args = sys.argv[1:]
+    app = None
+    positional = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--app":
+            i += 1
+            app = args[i] if i < len(args) else None
+        elif a.startswith("--app="):
+            app = a.split("=", 1)[1]
+        else:
+            positional.append(a)
+        i += 1
+    target = positional[0] if positional else "."
+    if app is None and len(positional) > 1:
+        app = positional[1]
+    print(json.dumps(resolve_context(target, app=app), indent=2))

@@ -264,3 +264,42 @@ real depth language. Omit `shadow` entirely for a borders-only system.)
 Keep `DESIGN.md` (prose, for humans + the agent) and the token files (machine,
 for the build) in sync — regenerating tokens after editing the palette/scale is
 part of the generate-design-md workflow.
+
+## Monorepo: per-app DESIGN.md inheritance
+
+A monorepo may carry a **root `DESIGN.md`** (the base design system shared by every
+app) plus **per-app `DESIGN.md` files** (e.g. `apps/web/DESIGN.md`,
+`packages/admin/DESIGN.md`) that **override/extend** the root for that one app. Resolving
+the contract for an app path folds the chain rootmost → appmost, with **the app
+winning**: `root base ⊕ each deeper contract ⊕ the app's own`.
+
+How the merge works (`contract.merge_contracts`, applied fold-left over the chain):
+
+- **dict keys** — `colors`, `dark_colors`, `typography`, `components`, `contrast` —
+  merge **per key**; the child's entries win, base-only roles are retained. (An app can
+  retint `primary` and add a new role while keeping every inherited role.)
+- **list keys** — `fonts`, `spacing`, `radius` — the child **replaces** the base list
+  when the child's list is non-empty; otherwise the base list is inherited.
+- **scalar keys** — `register`, `depth`, `elevation`, `apca_target`, `source_format` —
+  the child **overrides** when present (not null), else the base value carries through.
+- `source` is the most-specific (app) file; `machine_block_dropped` is concatenated.
+- Provenance is recorded additively: `inherits = {base_source, overrides:[keys the app
+  set]}`, and a `chain` lists the contract source paths rootmost → appmost.
+
+A **single-contract repo** (only a root `DESIGN.md`, no per-app files) is resolved
+exactly as before — no `inherits`/`chain` keys, byte-identical to `resolve_contract`.
+
+Resolve an app's inherited contract from the step-0 resolver:
+
+```
+python3 scripts/context.py <repo_dir> --app apps/web
+```
+
+This walks from the app dir up to the repo root, collecting every dir that has a
+contract (a `DESIGN.md` case-insensitive **or** `design/design-tokens.json`), merges
+them, and adds `design_md_chain` + `inherits` to the output, with `register` /
+`contract_valid` taken from the **merged** contract. Without `--app` the output is
+unchanged, except that when more than one `DESIGN.md` exists the resolver lists them in
+`design_md_files` and nudges you to pick an app. (`contract.resolve_contract_for_app(app_dir,
+repo_root)` is the underlying API; live-mode scopes to the active app's inherited
+contract via the same call — see capabilities/live-mode.md.)

@@ -156,6 +156,28 @@ def test_confinement_requires_project_dir_and_resolves_symlinks(tmp_path):
         assert esc is False, "a symlink escaping the project root must be rejected"
 
 
+def test_safe_app_drops_escaping_app(tmp_path):
+    # Path-escape: a monorepo --app must be a RELATIVE subdir confined to projectDir.
+    # A relative in-project app is kept; an absolute app, a `../` traversal, and a
+    # missing-projectDir case are all DROPPED (returns '') so resolution can't leak an
+    # off-project DESIGN.md (the caller then uses the plain project contract).
+    root = tmp_path / "proj"
+    (root / "apps" / "web").mkdir(parents=True)
+    out = _eval(
+        "["
+        "p.safeApp('apps/web', %r),"       # in-project relative -> kept
+        "p.safeApp('../../etc', %r),"      # traversal escape -> dropped
+        "p.safeApp(%r, %r),"               # absolute path -> dropped
+        "p.safeApp('apps/web', undefined),"  # no projectDir -> dropped
+        "p.safeApp('', %r)"                # empty app -> dropped
+        "]" % (str(root),
+               str(root),
+               str(tmp_path / "secret"), str(root),
+               str(root))
+    )
+    assert out == ["apps/web", "", "", "", ""]
+
+
 def test_accept_and_revert_refused_without_project_dir():
     # #4: /accept and /revert must 403 when started WITHOUT --project-dir (no confinement
     # root => could write anywhere). Send a loopback Host header AND the correct token so

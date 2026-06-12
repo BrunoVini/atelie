@@ -455,12 +455,37 @@ def session_commit(journal_dir, session, cwd=None):
             "commit": sha if rc == 0 else None}
 
 
-def _resolve_contract_arg(value):
+def _resolve_contract_arg(value, app=None):
     """Resolve a --contract arg (a repo dir / tokens.json / DESIGN.md) into a contract
     dict, reusing contract.py. Falls back to reading raw JSON if it's a tokens-shaped
-    file contract.py can't route (kept tolerant so the picker never hard-fails)."""
+    file contract.py can't route (kept tolerant so the picker never hard-fails).
+
+    When `app` names a sub-directory inside the contract's repo dir (a monorepo app),
+    the contract is resolved with per-app DESIGN.md inheritance (resolve_contract_for_app)
+    so live-mode variants/accept are scoped to the ACTIVE app's inherited contract. This
+    is additive: without --app, or if the app dir isn't inside a monorepo, resolution is
+    byte-identical to plain resolve_contract."""
     try:
-        from contract import resolve_contract
+        from contract import resolve_contract, resolve_contract_for_app
+        if app and os.path.isdir(value):
+            app_dir = app if os.path.isabs(app) else os.path.join(value, app)
+            # SECURITY: confine app_dir within `value` (the repo root) before resolving.
+            # An absolute `app` (or a `../` traversal) must NOT let resolution walk to an
+            # arbitrary on-disk DESIGN.md — reject it here and fall back to the plain
+            # project contract. realpath mirrors resolve_contract_for_app's own check.
+            root_real = os.path.realpath(value)
+            app_real = os.path.realpath(app_dir)
+            confined = app_real == root_real
+            if not confined:
+                try:
+                    confined = os.path.commonpath([app_real, root_real]) == root_real
+                except ValueError:
+                    confined = False
+            if confined and os.path.isdir(app_dir):
+                try:
+                    return resolve_contract_for_app(app_dir, repo_root=value)
+                except Exception:
+                    pass  # fall back to the plain repo contract below
         return resolve_contract(value)
     except Exception:
         if os.path.isfile(value):
@@ -485,6 +510,7 @@ if __name__ == "__main__":
     v.add_argument("--prop", help="CSS property (required for range/toggle)")
     v.add_argument("--n", type=int, default=3)
     v.add_argument("--contract", required=True, help="repo dir | tokens.json | DESIGN.md")
+    v.add_argument("--app", help="monorepo app subdir — scope to its inherited DESIGN.md")
     v.add_argument("--current", default="{}", help="current styles as a JSON object")
 
     # ── session ops ──
@@ -505,7 +531,7 @@ if __name__ == "__main__":
         print(json.dumps(revert(ns.journal_dir, ns.journal_id)))
     elif ns.cmd == "variants":
         try:
-            contract = _resolve_contract_arg(ns.contract)
+            contract = _resolve_contract_arg(ns.contract, app=getattr(ns, "app", None))
             current = json.loads(ns.current or "{}")
             out = build_variants(current, contract, ns.mode, prop=ns.prop, n=ns.n)
             print(json.dumps({"ok": True, "mode": ns.mode, "variants": out}))
