@@ -1,6 +1,6 @@
 # atelier
 
-**A repo-aware design studio that *governs* your design — it doesn't just generate pages.** Ships as a Claude Code plugin, a standalone CLI, and a multi-harness skill (Codex / Cursor).
+**A repo-aware design studio that *governs* your design — it doesn't just generate pages.** Ships as a Claude Code plugin, a standalone CLI, and a multi-harness skill (Codex, Cursor, Gemini, Copilot, OpenCode, and more).
 
 Most design tools (AI or otherwise) generate a pretty artifact and walk away.
 atelier does the senior thing: it **measures** the design language already living
@@ -34,10 +34,30 @@ and video export are optional and need Node + a headless browser.
 
 ### Beyond Claude Code
 
-atelier is authored once and also builds for **Codex** and **Cursor** via
-`python3 scripts/build_dist.py --harness all` (see [HARNESSES.md](HARNESSES.md)). The
-collision-gate hook that forces a re-check before an agent stops is Claude-Code-only —
-a documented degradation; the self-QA loop (`qa.py`) runs on every harness.
+atelier is authored once and builds for **Codex, Cursor, Gemini CLI, GitHub Copilot,
+OpenCode, Kiro, Pi, Qoder, Trae, and Rovo Dev** from the same source. Build the tree
+for your harness and copy it into your project (or your user-level config dir):
+
+```text
+python3 scripts/build_dist.py --harness all       # all harnesses into dist/
+python3 scripts/build_dist.py --harness codex      # just one
+```
+
+Each harness gets atelier installed at its native skill path (e.g. `.cursor/skills/`,
+`.gemini/skills/`, `.github/skills/`), so the skill triggers on the same design
+requests as on Claude Code — just ask for the work in natural language.
+
+The seven commands (`design-md`, `check`, `review`, `refine`, `preview`, `variants`,
+`migrate`) are ported into each harness's own command system where one exists — Codex
+custom prompts, Cursor commands, Gemini TOML commands, Copilot prompt files, OpenCode
+commands — so `/atelier-review` (or your harness's equivalent) works there too.
+Harnesses without a command system (Kiro, Pi, Qoder, Trae, Rovo Dev) invoke atelier by
+natural language instead.
+
+The collision-gate hook that *forces* a re-check before an agent stops is
+Claude-Code-only — a documented degradation. On every other harness the self-QA loop
+(`python3 scripts/qa.py <artifact> --hook`) is the definition of done. See the
+per-harness capability + degradation matrix in [HARNESSES.md](HARNESSES.md).
 
 ## What runs when you install
 
@@ -58,8 +78,9 @@ No surprises. Installing or cloning atelier runs **nothing**:
   before an agent is allowed to finish, and **gates** (blocks the stop) if it finds
   one. It runs locally, reads files, and makes **no network calls**.
 - **The hook ships only to the Claude build.** Other harnesses (Codex, Cursor, Gemini,
-  Copilot, Kiro, OpenCode, Pi) don't carry `hooks/` and can't be force-gated — they
-  fall back to the `qa.py` self-QA loop. See the per-harness degradation matrix in
+  Copilot, OpenCode, Kiro, Pi, Qoder, Trae, Rovo Dev) don't carry `hooks/` and can't be
+  force-gated — they fall back to the `qa.py` self-QA loop. See the per-harness
+  degradation matrix in
   [HARNESSES.md](HARNESSES.md).
 
 ## Commands

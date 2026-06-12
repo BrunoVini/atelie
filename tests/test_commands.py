@@ -103,16 +103,19 @@ def test_bodies_use_plugin_root_for_scripts():
                     f"{name}: script invocation not plugin-root-relative: {snippet!r}"
 
 
-# --- build wiring: commands land on claude only -----------------------------
+# --- build wiring: claude ships commands/ inside the skill ------------------
 
-def test_build_includes_commands_for_claude_only(tmp_path):
+def test_build_includes_commands_inside_claude_skill(tmp_path):
     res = build_dist.build(["claude", "codex", "cursor"], str(tmp_path))
 
     claude_cmds = os.path.join(res["claude"]["skill_dir"], "commands")
-    assert os.path.isdir(claude_cmds), "claude tree must carry commands/"
+    assert os.path.isdir(claude_cmds), "claude tree must carry commands/ in the skill"
     present = {f[:-3] for f in os.listdir(claude_cmds) if f.endswith(".md")}
     assert present == set(EXPECTED), f"claude commands incomplete: {present}"
+    assert res["claude"]["commands"]["system"] == "claude"
 
+    # Non-Claude harnesses do NOT carry commands/ inside the skill dir; their native
+    # commands are emitted sibling to the skill (see test_build_dist.py).
     for h in ("codex", "cursor"):
         assert not os.path.isdir(os.path.join(res[h]["skill_dir"], "commands")), \
-            f"{h} tree must NOT carry commands/ (Claude-only feature)"
+            f"{h} skill dir must NOT carry commands/ (it ports to a native dir instead)"

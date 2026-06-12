@@ -204,10 +204,16 @@ node scripts/chart_legibility.mjs <file|url>                     # unreadable/ov
 
 Run this loop on your OWN generated output, not just the user's — it routinely catches
 generic-font/oklch-default tells, contrast misses, missing keyboard focus
-(`no-focus-visible`), and decoration drift you won't eyeball. When atelier is installed
-as a plugin, the Stop/SubagentStop hook (`hooks/hooks.json`) runs the rendered floor
-automatically and blocks finishing on a real collision — but don't rely on it; run `qa.py`
-yourself. For a pull request, `python3 scripts/pr_review.py <repo> --base <ref>` reports
+(`no-focus-visible`), and decoration drift you won't eyeball. On **Claude Code**, where
+atelier is installed as a plugin, the Stop/SubagentStop hook (`hooks/hooks.json`) runs
+the rendered floor automatically and blocks finishing on a real collision — but don't
+rely on it; run `qa.py` yourself. On **every other harness** (Codex, Cursor, Gemini,
+Copilot, OpenCode, Kiro, Pi, Qoder, Trae, Rovo Dev) there is **no harness gate that can
+force the re-check** — the discipline is yours to enforce, so before you declare any
+artifact done run `python3 scripts/qa.py <artifact> --hook` and treat its exit code as
+the gate: exit 0 is done, a non-zero exit means fix the flagged item and re-run. Do not
+report an artifact finished on those harnesses without a passing `--hook` run. For a pull
+request, `python3 scripts/pr_review.py <repo> --base <ref>` reports
 only the lines the PR changed, as GitHub annotations.
 If you can't render (no browser), say so and rely on the static checks. Skipping this is
 the difference between "I made a page" and "I made a verified, on-contract page."

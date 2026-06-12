@@ -85,6 +85,10 @@ _NEW_HARNESSES = [
     ("kiro", os.path.join(".kiro", "skills", "atelier"), True),
     ("opencode", os.path.join(".opencode", "skills", "atelier"), True),
     ("pi", os.path.join(".pi", "skills", "atelier"), True),
+    ("qoder", os.path.join(".qoder", "skills", "atelier"), True),
+    ("trae", os.path.join(".trae", "skills", "atelier"), True),
+    ("trae-cn", os.path.join(".trae-cn", "skills", "atelier"), True),
+    ("rovodev", os.path.join(".rovodev", "skills", "atelier"), True),
 ]
 
 
@@ -131,6 +135,150 @@ def test_opencode_layout_and_frontmatter(tmp_path):
 
 def test_pi_layout_and_frontmatter(tmp_path):
     _assert_new_harness(tmp_path, *_NEW_HARNESSES[4])
+
+
+def test_qoder_layout_and_frontmatter(tmp_path):
+    _assert_new_harness(tmp_path, *_NEW_HARNESSES[5])
+
+
+def test_trae_layout_and_frontmatter(tmp_path):
+    _assert_new_harness(tmp_path, *_NEW_HARNESSES[6])
+
+
+def test_trae_cn_layout_and_frontmatter(tmp_path):
+    _assert_new_harness(tmp_path, *_NEW_HARNESSES[7])
+
+
+def test_rovodev_layout_and_frontmatter(tmp_path):
+    _assert_new_harness(tmp_path, *_NEW_HARNESSES[8])
+
+
+# --- command porting: each harness gets its native command format -----------
+
+COMMAND_NAMES = build_dist.COMMAND_NAMES
+
+
+def test_codex_ports_prompts(tmp_path):
+    res = build_dist.build(["codex"], str(tmp_path))["codex"]
+    assert res["commands"]["system"] == "codex"
+    base = os.path.join(res["out"], ".codex", "prompts")
+    assert os.path.isdir(base)
+    for name in COMMAND_NAMES:
+        p = os.path.join(base, f"atelier-{name}.md")
+        assert os.path.isfile(p), f"missing codex prompt {name}"
+        text = _read(p)
+        # markdown custom prompt: frontmatter description, $ARGUMENTS native,
+        # ${CLAUDE_PLUGIN_ROOT} rewritten to the codex skill install path.
+        assert text.startswith("---\n")
+        assert "description:" in text
+        assert "${CLAUDE_PLUGIN_ROOT}" not in text
+    review = _read(os.path.join(base, "atelier-review.md"))
+    assert "$ARGUMENTS" in review
+    assert ".agents/skills/atelier/scripts/qa.py" in review
+
+
+def test_cursor_ports_commands(tmp_path):
+    res = build_dist.build(["cursor"], str(tmp_path))["cursor"]
+    assert res["commands"]["system"] == "cursor"
+    base = os.path.join(res["out"], ".cursor", "commands")
+    assert os.path.isdir(base)
+    for name in COMMAND_NAMES:
+        p = os.path.join(base, f"atelier-{name}.md")
+        assert os.path.isfile(p), f"missing cursor command {name}"
+        text = _read(p)
+        # Cursor has no arg variable: $ARGUMENTS must be gone (prose substitution),
+        # and the script path is rewritten to the cursor skill install path.
+        assert "$ARGUMENTS" not in text
+        assert "${CLAUDE_PLUGIN_ROOT}" not in text
+    assert ".cursor/skills/atelier/scripts/" in _read(
+        os.path.join(base, "atelier-review.md"))
+
+
+def test_gemini_ports_toml_commands(tmp_path):
+    res = build_dist.build(["gemini"], str(tmp_path))["gemini"]
+    assert res["commands"]["system"] == "gemini"
+    base = os.path.join(res["out"], ".gemini", "commands", "atelier")
+    assert os.path.isdir(base)
+    for name in COMMAND_NAMES:
+        p = os.path.join(base, f"{name}.toml")
+        assert os.path.isfile(p), f"missing gemini toml {name}"
+        text = _read(p)
+        assert text.startswith("description = ")
+        assert 'prompt = """' in text
+        assert "$ARGUMENTS" not in text       # Gemini uses {{args}}
+        assert "${CLAUDE_PLUGIN_ROOT}" not in text
+    assert "{{args}}" in _read(os.path.join(base, "check.toml"))
+
+
+def test_copilot_ports_prompt_files(tmp_path):
+    res = build_dist.build(["copilot"], str(tmp_path))["copilot"]
+    assert res["commands"]["system"] == "copilot"
+    base = os.path.join(res["out"], ".github", "prompts")
+    assert os.path.isdir(base)
+    for name in COMMAND_NAMES:
+        p = os.path.join(base, f"atelier-{name}.prompt.md")
+        assert os.path.isfile(p), f"missing copilot prompt {name}"
+        text = _read(p)
+        assert text.startswith("---\n")
+        assert "description:" in text
+        assert "$ARGUMENTS" not in text       # VS Code uses ${input:...}
+        assert "${CLAUDE_PLUGIN_ROOT}" not in text
+    assert "${input:target}" in _read(os.path.join(base, "atelier-review.prompt.md"))
+
+
+def test_opencode_ports_commands(tmp_path):
+    res = build_dist.build(["opencode"], str(tmp_path))["opencode"]
+    assert res["commands"]["system"] == "opencode"
+    base = os.path.join(res["out"], ".opencode", "commands")
+    assert os.path.isdir(base)
+    for name in COMMAND_NAMES:
+        p = os.path.join(base, f"atelier-{name}.md")
+        assert os.path.isfile(p), f"missing opencode command {name}"
+        text = _read(p)
+        assert text.startswith("---\n")
+        assert "description:" in text
+        assert "${CLAUDE_PLUGIN_ROOT}" not in text
+    assert "$ARGUMENTS" in _read(os.path.join(base, "atelier-review.md"))
+
+
+def test_no_command_system_harnesses_emit_no_command_files(tmp_path):
+    # Kiro, Pi, Qoder, Trae, Trae-CN, Rovo Dev degrade to natural-language invoke.
+    degraded = ["kiro", "pi", "qoder", "trae", "trae-cn", "rovodev"]
+    res = build_dist.build(degraded, str(tmp_path))
+    for h in degraded:
+        assert res[h]["commands"]["system"] is None
+        assert res[h]["commands"]["files"] == []
+        # No stray command dirs anywhere in the tree.
+        files = _all_files(res[h]["out"])
+        assert not any("/prompts/" in f or "/commands/" in f for f in files), \
+            f"{h} must emit no command files"
+        # And no commands/ inside the skill dir either.
+        assert not os.path.isdir(os.path.join(res[h]["skill_dir"], "commands"))
+
+
+def test_ported_commands_reference_real_scripts(tmp_path):
+    # Every script path a ported command names must resolve back to a real repo file.
+    import re
+    res = build_dist.build(sorted(build_dist.HARNESSES), str(tmp_path))
+    script_re = re.compile(r"(scripts/[\w./-]+\.(?:py|mjs|cjs|sh))")
+    for h, s in res.items():
+        for rel in s["commands"]["files"]:
+            text = _read(os.path.join(s["out"], rel))
+            for m in script_re.finditer(text):
+                repo_rel = m.group(1)
+                assert os.path.exists(os.path.join(REPO, repo_rel)), \
+                    f"{h}:{rel} references nonexistent script {repo_rel!r}"
+
+
+def test_command_files_written_only_under_out(tmp_path):
+    # Ported command files (sibling to the skill dir) must stay inside --out.
+    out = tmp_path / "out"
+    res = build_dist.build(sorted(build_dist.HARNESSES), str(out))
+    out_abs = os.path.abspath(str(out))
+    for s in res.values():
+        for rel in s["commands"]["files"]:
+            p = os.path.abspath(os.path.join(s["out"], rel))
+            assert p.startswith(out_abs + os.sep)
 
 
 # --- degradation: collision hook is Claude-only -----------------------------
