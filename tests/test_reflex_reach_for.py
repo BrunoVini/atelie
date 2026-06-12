@@ -1,7 +1,7 @@
 """Phase F: the `reach_for` column on reflex-reject.csv — the named, concrete
 distinctive alternatives that turn each "avoid" row into positive direction.
 
-Guards: the column exists, parses with csv.DictReader, every one of the 42 rows has
+Guards: the column exists, parses with csv.DictReader, every one of the 90 rows has
 non-empty curated content, and the 1:1 category alignment with products.csv is preserved
 (same category set, same count) so cold_start_ledger and the KB stay in sync.
 """
@@ -33,8 +33,8 @@ def test_existing_columns_preserved():
     assert set(rows[0].keys()) == expected, set(rows[0].keys())
 
 
-def test_exactly_42_rows():
-    assert len(_reflex_rows()) == 42
+def test_exactly_90_rows():
+    assert len(_reflex_rows()) == 90
 
 
 def test_every_reach_for_cell_is_non_empty():
@@ -69,5 +69,5 @@ def test_reach_for_avoids_the_banned_overused_faces():
 def test_category_set_matches_products_one_to_one():
     reflex_cats = [r["category"] for r in _reflex_rows()]
     prod_cats = [r["product_type"] for r in csv.DictReader(open(PRODUCTS, encoding="utf-8"))]
-    assert len(reflex_cats) == len(prod_cats) == 42
+    assert len(reflex_cats) == len(prod_cats) == 90
     assert set(reflex_cats) == set(prod_cats), set(reflex_cats) ^ set(prod_cats)
