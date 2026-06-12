@@ -108,11 +108,33 @@ Real content is longer than mock content. The defenses:
   `min-width` so it stays tappable; it still grows for long labels. See `i18n-rtl.md`.
   *(judgment)*
 
+## Decorations — keep them inside the box, anchored to what they annotate
+
+- **An absolutely-positioned decoration with a negative offset (`bottom: -12px`)
+  inside an `overflow: hidden` ancestor of viewport-limited height WILL clip** at
+  some screen size — the offset pushes it past the box edge, the clip eats it.
+  Position the decoration INSIDE the card's box (positive offsets) or reserve real
+  space for it (padding/`min-height`), rather than hanging it off the edge.
+  *(judgment — the rendered sweep catches it only at the width/height where it clips)*
+- **Anchor a decoration to the element it annotates, not to the section.** A doodle
+  pinned by percentage to a section (`bottom: 3%` of an `inset: 0` layer) drifts onto
+  interactive targets when the section grows much taller than designed — most acutely
+  on mobile single-column, where a section that was ~700px on desktop stacks to
+  ~1500px and the % anchor lands mid-content, over a button. Anchor it to its real
+  neighbour (a flow sibling / a positioned wrapper around the thing it decorates), or
+  hide it (`display: none`) at the widths where the proportion changes. *(rendered —
+  `responsive_check.mjs` flags decoration-over-text, but only when swept at the real
+  mobile widths: 360 / 390 / 414)*
+
 ## Responsive — width is not the only axis
 
 - **Test short viewports too.** Sticky/absolute elements overlap when the window is
   *short*, not just narrow. A vertical media query — `@media (min-height: 600px)` — gates
   height-dependent layout. *(judgment)*
+- **Re-verify %-anchored decorations at TALL content heights**, not just at the
+  reference height. A single-column mobile layout is the canonical case: sweep
+  `responsive_check.mjs` at 360/390/414 and confirm no decoration drifted onto copy or
+  a tap target. *(rendered)*
 - **Don't trigger hover on touch.** A half-tap while scrolling fires a sticky `:hover`
   state on touch devices. Wrap hover affordances in `@media (hover: hover)`. *(rendered —
   flagging every bare `:hover` would false-positive)*

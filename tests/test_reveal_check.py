@@ -133,3 +133,62 @@ def test_stuck_reveal_with_js_on_is_flagged(tmp_path):
     assert r.returncode == 1, f"a reveal that never fires (content opacity:0 with JS on) must FAIL\n{r.stderr}"
     out = json.loads(r.stdout)
     assert out["stuck_fraction"] >= 0.15, out
+
+
+# An SVG ink-draw entrance where a bespoke idle `animation` shorthand on the SAME
+# elements overwrites the draw animation (one element, one `animation` property — the
+# last declaration wins), so the strokes stay fully undrawn (dashoffset == dasharray)
+# forever, WITH JS on. The artwork is permanently invisible — the engine never released
+# the dash/hidden state.  (Enough body text so the page isn't "trivial".)
+_PADDING = (
+    '<h1>Portfolio headline that gives the page real visible text content to measure</h1>'
+    '<p>This paragraph carries enough real words that the page is not trivial, so the '
+    'stroke check is what decides the verdict rather than a near-empty document guard.</p>'
+)
+STUCK_STROKE = (
+    '<!doctype html><html><head><meta charset="utf-8"><style>'
+    'svg{width:300px;height:120px}'
+    # base hidden (ink) state: whole dash pattern pushed off the path
+    '.ink{stroke:#c00;stroke-width:3;fill:none;stroke-dasharray:40;stroke-dashoffset:40}'
+    # a bespoke idle animation that does NOT touch dashoffset — and, being the single
+    # `animation` shorthand, leaves the stroke stuck at the hidden dashoffset:40 forever.
+    '.ink{animation:wiggle 2s ease-in-out infinite}'
+    '@keyframes wiggle{0%{stroke-width:3}50%{stroke-width:4}100%{stroke-width:3}}'
+    '</style></head><body>' + _PADDING +
+    '<svg viewBox="0 0 100 40"><path class="ink" d="M2 20 L98 20"/>'
+    '<path class="ink" d="M2 30 L98 30"/><path class="ink" d="M2 10 L98 10"/></svg>'
+    '</body></html>'
+)
+
+# Healthy counterpart: the strokes rest fully DRAWN (dashoffset:0), so nothing is stuck.
+DRAWN_STROKE = (
+    '<!doctype html><html><head><meta charset="utf-8"><style>'
+    'svg{width:300px;height:120px}'
+    '.ink{stroke:#c00;stroke-width:3;fill:none;stroke-dasharray:40;stroke-dashoffset:0}'
+    '</style></head><body>' + _PADDING +
+    '<svg viewBox="0 0 100 40"><path class="ink" d="M2 20 L98 20"/>'
+    '<path class="ink" d="M2 30 L98 30"/><path class="ink" d="M2 10 L98 10"/></svg>'
+    '</body></html>'
+)
+
+
+def test_stuck_svg_strokes_are_flagged(tmp_path):
+    p = tmp_path / "stroke.html"
+    p.write_text(STUCK_STROKE)
+    r = _run(p)
+    if _no_browser(r):
+        return
+    assert r.returncode == 1, f"SVG strokes left fully undrawn with JS on must FAIL\n{r.stderr}"
+    out = json.loads(r.stdout)
+    assert out["strokes_stuck"] >= 2 and out["stroke_fraction"] >= 0.34, out
+
+
+def test_drawn_svg_strokes_pass(tmp_path):
+    p = tmp_path / "drawn.html"
+    p.write_text(DRAWN_STROKE)
+    r = _run(p)
+    if _no_browser(r):
+        return
+    assert r.returncode == 0, f"fully-drawn resting strokes must PASS\n{r.stderr}"
+    out = json.loads(r.stdout)
+    assert out["strokes_stuck"] == 0, out

@@ -87,6 +87,50 @@ mm.add("(prefers-reduced-motion: no-preference)", () => {
 });
 ```
 
+## Declarative entrance/reveal engines: RELEASE, don't rely on fill
+
+A reveal/entrance engine that takes ownership of element properties (a scroll-in
+"ink-draw" that stamps `stroke-dasharray`/`stroke-dashoffset` + an `animation` on
+every stroke, an opacity-reveal that flips a class) is the single highest-risk
+motion pattern after scroll-jacking — because it sets a HIDDEN base state and then
+depends on something firing to undo it. When the undo doesn't fire, or another rule
+wins, the element is permanently invisible and it looks identical to "not yet
+revealed" in a final-state screenshot. The rules:
+
+| Rule | Failure it prevents |
+|---|---|
+| **Release on completion.** When entry finishes (`animationend` / IO callback / timeout), REMOVE the hidden state (strip the dash/opacity class, clear the engine's custom props) so the element is back in its natural resting state. | A later rule (or a re-render) re-reads a leftover `dashoffset`/`opacity:0` and the element vanishes after it was already revealed. The resting state, not the animation fill, must be the source of truth. |
+| **Never assume the engine owns every element.** Auto-collecting "all strokes in `[data-ink]`" silently captures handcrafted artwork that already has its own animation. Provide an opt-out (`data-…-skip`) and scope what the engine claims. | The engine fights bespoke idle/hover motion on the same node. |
+| **Guard handcrafted animations against the engine.** `animation` is a SINGLE shorthand: two sources of `animation` on one element = one silently wins (the later/more-specific declaration replaces the list, cancelling the other's fill). Gate bespoke rules so they wait for entry to finish — e.g. `.idle:not(.is-entering) { animation: … }` — and ensure the no-JS path still matches them. | A bespoke `:hover`/idle `animation` overwrites the entrance draw → the stroke never draws and stays at its hidden `dashoffset` forever. |
+| **Respect `pathLength` when measuring SVG paths.** If artwork normalizes its dash space with `pathLength="100"`, the engine must use 100 (or read the attribute), NOT `getTotalLength()` — the real length is a different number and the paired draw/follower desync. | Engine measures 45px, artwork's dash space is 100 → the line "finishes" halfway while the tip rides the whole curve. |
+| **Loops are closed cycles: 100% identical to 0%** on every property the keyframes animate. Put the contrasting state on a MID-cycle stop, not the end. | An `infinite` loop whose end ≠ start snaps back on every restart. |
+
+`mid-animation` is part of acceptance, not just the rest frame: **screenshot the
+entrance MID-FLIGHT** (e.g. ~12% / 50% / 90%) and the loop at BOTH boundaries
+(t just before and just after wrap). A permanently-hidden element and a "not-yet-
+revealed" one are pixel-identical at the final frame — only a mid-state capture (and
+the checks below) tell them apart. "An animation that was never seen working" is the
+named failure: do not ship a reveal/loop you only ever saw in its rest state.
+
+**Mechanical backstops** (run in `qa.py`; extend, don't re-derive):
+- `reveal_check.mjs` sweeps the page with JS ON and FAILS when SVG draw-strokes stay
+  fully undrawn (`|dashoffset|` ≈ dash length) — the "engine never released it /
+  shorthand collision" class — alongside its opacity-stuck and no-JS coverage gates.
+- `motion_static_check.py` (static, no browser) flags an `infinite` `@keyframes`
+  whose 0% and 100% disagree (advisory: snap-on-restart), and `textLength`/
+  `lengthAdjust` on an SVG `<text>` (important: see below).
+
+## Hand-lettering / display type: measure the text, size the decoration to it
+
+Never use `textLength`/`lengthAdjust` to pin SVG `<text>` to a pre-computed width.
+It turns off the font's contextual kerning/shaping and stretches or squeezes glyphs
+to hit the number — lethal on display/handwriting faces. Instead: let the text render
+at its natural advance, measure it AFTER `document.fonts.ready` (`getComputedTextLength`),
+and derive the mask/underline/highlight geometry FROM the measured width — not the text
+to the width. In JSX/templates, set the text via a single expression (`set:text` /
+one `{word}`) so formatting whitespace never leaks into the `<text>` node and eats the
+width budget. (`motion_static_check.py` flags `textLength` on `<text>` as important.)
+
 ## Reduced-motion is the contract, not an afterthought
 
 Wrap every scroll animation in `gsap.matchMedia("(prefers-reduced-motion:
