@@ -227,9 +227,17 @@ def main(argv=None):
     if _MISSING in (contract, max_drift, max_overlap, sarif_path):
         return 2
     if "--max-drift" in args:
-        max_drift = int(max_drift)
+        try:
+            max_drift = int(max_drift)
+        except (TypeError, ValueError):
+            print("::error:: --max-drift must be an integer")
+            return 2
     if "--max-overlap-risk" in args:
-        max_overlap = int(max_overlap)
+        try:
+            max_overlap = int(max_overlap)
+        except (TypeError, ValueError):
+            print("::error:: --max-overlap-risk must be an integer")
+            return 2
     sarif_to_stdout = sarif_path == "-"
     if not has_contract(contract):
         print(f"::error:: no contract for {contract} — need design/design-tokens.json or "

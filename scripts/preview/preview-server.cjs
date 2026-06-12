@@ -162,6 +162,26 @@ const ALLOWED_HOSTS = [HOST, URL_HOST];
 
 // ========== Helper Functions ==========
 
+// Resolve a /design/... request URL to a filesystem path CONFINED to <projectDir>/design.
+// Returns the absolute path if it resolves inside the design dir (or is the design dir
+// itself), else null. Confines against `<design> + path.sep` so a sibling dir whose name
+// merely starts with "design" (e.g. design-private) can't be reached via /design/../...
+// Mirrors the `root + path.sep` pattern in live-proxy.cjs#isConfined and /edit/apply.
+function isUnderDesignDir(projectDir, reqUrl) {
+  const rel = String(reqUrl).replace(/^\/+/, '').split('?')[0];
+  const designDir = path.resolve(projectDir, 'design');
+  const target = path.resolve(projectDir, path.normalize(rel));
+  if (target === designDir) return true;
+  return target.indexOf(designDir + path.sep) === 0;
+}
+
+// null when the request escapes the design dir; otherwise the confined absolute path.
+function designFilePath(projectDir, reqUrl) {
+  if (!isUnderDesignDir(projectDir, reqUrl)) return null;
+  const rel = String(reqUrl).replace(/^\/+/, '').split('?')[0];
+  return path.resolve(projectDir, path.normalize(rel));
+}
+
 function isFullDocument(html) {
   const trimmed = html.trimStart().toLowerCase();
   return trimmed.startsWith('<!doctype') || trimmed.startsWith('<html');
@@ -223,9 +243,8 @@ function handleRequest(req, res) {
   } else if (req.method === 'GET' && PROJECT_DIR && req.url.startsWith('/design/')) {
     // Serve the project's exported design tokens so previews are themed by the
     // DESIGN.md contract (e.g. <link href="/design/tokens.css">).
-    const rel = req.url.replace(/^\/+/, '').split('?')[0];
-    const filePath = path.join(PROJECT_DIR, path.normalize(rel));
-    if (!filePath.startsWith(path.join(PROJECT_DIR, 'design')) || !fs.existsSync(filePath)) {
+    const filePath = designFilePath(PROJECT_DIR, req.url);
+    if (filePath === null || !fs.existsSync(filePath)) {
       res.writeHead(404);
       res.end('Not found');
       return;
@@ -511,4 +530,5 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { computeAcceptKey, encodeFrame, decodeFrame, OPCODES, isAllowedHost, tokenOk };
+module.exports = { computeAcceptKey, encodeFrame, decodeFrame, OPCODES, isAllowedHost, tokenOk,
+                    isUnderDesignDir, designFilePath };

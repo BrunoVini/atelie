@@ -112,3 +112,28 @@ def test_corrupt_config_yields_clean_exit_2(tmp_path):
     # no Python traceback leaked to either stream
     assert "Traceback (most recent call last)" not in (r.stdout + r.stderr)
     assert "JSONDecodeError" not in (r.stdout + r.stderr)
+
+
+def test_non_integer_max_drift_yields_clean_exit_2(tmp_path):
+    # a non-numeric --max-drift must print a clean ::error:: and exit 2 — NOT a traceback
+    repo = _repo(tmp_path)
+    r = _check([repo, "--max-drift", "abc"])
+    assert r.returncode == 2
+    assert "::error:: --max-drift must be an integer" in r.stdout
+    assert "Traceback (most recent call last)" not in (r.stdout + r.stderr)
+    assert "ValueError" not in (r.stdout + r.stderr)
+
+
+def test_non_integer_max_overlap_risk_yields_clean_exit_2(tmp_path):
+    repo = _repo(tmp_path)
+    r = _check([repo, "--max-overlap-risk", "xyz"])
+    assert r.returncode == 2
+    assert "::error:: --max-overlap-risk must be an integer" in r.stdout
+    assert "Traceback (most recent call last)" not in (r.stdout + r.stderr)
+
+
+def test_valid_integer_max_drift_still_works(tmp_path):
+    # regression guard: a valid integer override still passes the gate as before
+    repo = _repo(tmp_path)
+    assert _check([repo]).returncode == 1               # config gate at 0 -> fail
+    assert _check([repo, "--max-drift", "5"]).returncode == 0

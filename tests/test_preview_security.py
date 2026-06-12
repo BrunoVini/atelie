@@ -102,6 +102,94 @@ def test_helper_injection_embeds_token_and_no_cors():
     assert "window.__atelierToken=" in src
 
 
+def test_design_dir_confinement_predicate():
+    # The /design/ route must confine to <projectDir>/design — a sibling dir whose name
+    # merely starts with "design" (e.g. design-private) must NOT be reachable via
+    # /design/../design-private/... (path-confinement info-disclosure regression).
+    out = _eval(
+        "["
+        "p.isUnderDesignDir('/proj', '/design/tokens.css'),"            # legit -> true
+        "p.isUnderDesignDir('/proj', '/design/'),"                      # bare design dir -> true
+        "p.isUnderDesignDir('/proj', '/design/../design-private/x'),"   # sibling escape -> false
+        "p.isUnderDesignDir('/proj', '/design/../../etc/passwd'),"      # parent escape -> false
+        "p.isUnderDesignDir('/proj', '/design/sub/tokens.css')"         # nested -> true
+        "]"
+    )
+    assert out == [True, True, False, False, True]
+    # designFilePath returns null for the escape and a path for the legit request
+    out2 = _eval(
+        "["
+        "p.designFilePath('/proj', '/design/../design-private/secrets.env') === null,"
+        "p.designFilePath('/proj', '/design/tokens.css') !== null"
+        "]"
+    )
+    assert out2 == [True, True]
+
+
+def test_design_route_refuses_sibling_dir_escape_over_socket(tmp_path):
+    # End-to-end: GET /design/../design-private/secrets.env must 404 (confined), while
+    # GET /design/tokens.css under the project is served 200.
+    node = _node()
+    if not node:
+        pytest.skip("node not available")
+    session_dir = str(tmp_path / "preview")
+    proj_dir = str(tmp_path / "proj")
+    os.makedirs(os.path.join(proj_dir, "design"))
+    os.makedirs(os.path.join(proj_dir, "design-private"))
+    with open(os.path.join(proj_dir, "design", "tokens.css"), "w") as f:
+        f.write(":root{--x:1}")
+    with open(os.path.join(proj_dir, "design-private", "secrets.env"), "w") as f:
+        f.write("SECRET=hunter2")
+    script = r"""
+const http = require('http');
+const cp = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const PREVIEW = process.argv[1];
+const SESSION = process.argv[2];
+const PROJ = process.argv[3];
+fs.mkdirSync(path.join(SESSION, 'content'), {recursive:true});
+fs.mkdirSync(path.join(SESSION, 'state'), {recursive:true});
+const env = Object.assign({}, process.env, {
+  ATELIER_TOKEN: 'T', ATELIER_DIR: SESSION, ATELIER_HOST: '127.0.0.1', ATELIER_PROJECT_DIR: PROJ
+});
+delete env.ATELIER_PORT;
+const child = cp.spawn(process.execPath, [PREVIEW], {env});
+let buf = ''; let done = false;
+function finish(obj){ if(done) return; done = true; try{child.kill();}catch(_){}
+  process.stdout.write(JSON.stringify(obj)); process.exit(0); }
+function get(port, p, cb){
+  const req = http.request({hostname:'127.0.0.1', port, path:p, method:'GET',
+    headers:{Host:'localhost:'+port}}, res => {
+    let b=''; res.on('data',c=>b+=c); res.on('end',()=>cb(res.statusCode, b)); });
+  req.on('error', e => finish({error:e.message})); req.end();
+}
+child.stdout.on('data', d => {
+  buf += d.toString();
+  const line = buf.split('\n').find(l => l.indexOf('server-started') !== -1);
+  if (!line) return;
+  let info; try { info = JSON.parse(line); } catch(_) { return; }
+  const port = info.port;
+  get(port, '/design/tokens.css', (legitCode, legitBody) => {
+    get(port, '/design/../design-private/secrets.env', (escapeCode, escapeBody) => {
+      finish({legitCode, legitBody, escapeCode, escapeBody});
+    });
+  });
+});
+child.on('error', e => finish({error:'spawn '+e.message}));
+setTimeout(()=>finish({error:'timeout'}), 12000);
+"""
+    r = subprocess.run([node, "-e", script, PREVIEW, session_dir, proj_dir],
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out.get("error") is None, out
+    assert out["legitCode"] == 200, out
+    assert "--x" in out["legitBody"]
+    assert out["escapeCode"] == 404, out
+    assert "hunter2" not in out["escapeBody"]
+
+
 def test_server_serves_page_with_token_over_loopback(tmp_path):
     # End-to-end-ish: boot the server with a fixed token + content dir on a loopback port,
     # GET '/', and assert the page carries the injected token script. Also assert a request

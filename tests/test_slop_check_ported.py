@@ -814,3 +814,33 @@ def test_label_line_height_percent_leading():
     assert "label-line-height" not in _ported_kinds("p{font-size:16px;line-height:160%}")
     # a label at 140% is tight enough (below the 1.5 threshold)
     assert "label-line-height" not in _ported_kinds(".badge{font-size:12px;line-height:140%}")
+
+
+# --- no-focus-visible (Tailwind focus variants count as focus styling) -----------
+
+def test_tailwind_focus_utility_does_not_flag_no_focus_visible():
+    # A styled interactive page that provides focus via Tailwind utility variants
+    # (focus:ring-2 / focus-visible:outline) genuinely HAS focus affordance — must
+    # NOT fire no-focus-visible (false-positive at gating severity regression).
+    html = _page(body='<button class="focus:ring-2 focus-visible:outline">Go</button>',
+                 css=".x{color:red}")
+    assert "no-focus-visible" not in _kinds(html)
+
+
+def test_tailwind_focus_within_does_not_flag_no_focus_visible():
+    html = _page(body='<a href="#" class="focus-within:shadow">Link</a>', css=".x{color:red}")
+    assert "no-focus-visible" not in _kinds(html)
+
+
+def test_css_focus_visible_pseudo_does_not_flag_no_focus_visible():
+    html = _page(body='<button class="btn">Go</button>',
+                 css=".btn{color:red}.btn:focus-visible{outline:2px solid blue}")
+    assert "no-focus-visible" not in _kinds(html)
+
+
+def test_styled_interactive_with_no_focus_still_flags_no_focus_visible():
+    # True positive preserved: a styled interactive page with NO focus affordance
+    # of any kind still fires no-focus-visible at important severity.
+    html = _page(body='<button class="btn">Go</button>',
+                 css=".btn{color:red}.btn:hover{color:blue}")
+    assert "no-focus-visible" in _kinds(html, "important")

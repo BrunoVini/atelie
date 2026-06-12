@@ -428,7 +428,10 @@ def _dead_anchor_tells(html):
 
 _INTERACTIVE_EL = re.compile(r"<button\b|<a\b[^>]*\bhref|<input\b|<select\b|<textarea\b", re.I)
 _BTN_STYLE = re.compile(r"\.btn\b|\bbutton\s*\{", re.I)
-_FOCUS_RULE = re.compile(r":focus(?:-visible)?\b", re.I)
+# Focus affordance can be expressed two ways: a CSS pseudo-class (:focus / :focus-visible /
+# :focus-within) OR a Tailwind-style utility variant (focus:ring-2, focus-visible:outline,
+# focus-within:...). Match either so the rule fires ONLY when no focus styling exists at all.
+_FOCUS_RULE = re.compile(r":focus(?:-visible|-within)?\b|\bfocus(?:-visible|-within)?:", re.I)
 _HAS_STYLE = re.compile(r"<style\b", re.I)
 
 
