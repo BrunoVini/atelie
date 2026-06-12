@@ -3,7 +3,7 @@ import os
 import subprocess
 import sys
 
-from qa import CheckResult, verdict, format_evidence, _slop, _contrast, _a11y
+from qa import CheckResult, verdict, format_evidence, _slop, _contrast, _a11y, _motion_static
 
 _QA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "scripts", "qa.py")
@@ -45,6 +45,19 @@ def test_contrast_audits_both_themes_and_gates_dark_failure():
         "dark": {"ink": "#eeeeee", "paper": "#111111"},
     })
     assert ok.status == "pass"
+
+
+def test_motion_static_gates_textlength_and_loop_is_advisory():
+    # textLength on <text> is an important (gating) finding
+    bad = _motion_static('<svg><text textLength="100">craft.</text></svg>')
+    assert bad.status == "fail" and bad.gating is True and bad.counts["important"] >= 1
+    # a not-closed infinite loop is advisory only — does NOT flip the status to fail
+    adv = _motion_static('<style>.x{animation:p 2s infinite}'
+                         '@keyframes p{0%{fill:red}100%{fill:green}}</style>')
+    assert adv.status == "pass" and adv.counts["advisory"] >= 1
+    # a clean artifact passes with no findings
+    clean = _motion_static('<svg><text x="0">craft.</text></svg>')
+    assert clean.status == "pass" and clean.counts["important"] == 0
 
 
 def test_evidence_block_has_markers_target_and_verdict():

@@ -80,6 +80,24 @@ def _a11y(html):
     )
 
 
+def _motion_static(html):
+    """Static motion-craft layer for an HTML artifact (stdlib, no browser). An
+    `important` finding (SVG <text> pinned with textLength/lengthAdjust — kerning
+    killed on display type) GATES the verdict and the bound Stop hook; the
+    loop-not-closed finding is advisory (a snap-on-restart we can't always prove
+    statically). Defensive: check_motion never raises, so this can't crash the
+    battery."""
+    from motion_static_check import check_motion
+    findings = check_motion(html)
+    important = [f for f in findings if f["severity"] == "important"]
+    advisory = [f for f in findings if f["severity"] != "important"]
+    return CheckResult(
+        "motion-static", "fail" if important else "pass", True,
+        {"important": len(important), "advisory": len(advisory)},
+        "; ".join(sorted({f["kind"] for f in important})) or "clean",
+    )
+
+
 def _contrast(contract=None, colors=None, themes=None):
     """Palette contrast gate over the contract's color tokens.
 
@@ -345,6 +363,11 @@ def _battery(target, contract, widths, hook, kind=None, register=None):
         # with no alt, an unnamed icon control, an unlabeled input) gate the verdict
         # and the bound Stop hook — a page nobody can use should never read "done".
         results.append(_a11y(html))
+        # Static motion-craft: an SVG <text> pinned to a pre-computed width with
+        # textLength/lengthAdjust (kerning killed on display type) gates; a
+        # loop whose keyframes don't close (snap on restart) is advisory. Runs in
+        # both page and film mode — both ship SVG/CSS motion. Stdlib, no browser.
+        results.append(_motion_static(html))
         # RENDERED element-level contrast: measures the ACTUAL painted text/bg pairs and
         # gates only on bg_confident, size-graded failures (no contract needed). Prefer it
         # when a browser is available; it self-reports `unknown` (never gates) without one.

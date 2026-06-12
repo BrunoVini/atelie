@@ -71,9 +71,55 @@ const SWEEP_PROBE = `(async () => {
       if (node.nodeType === 3) { const s = node.textContent.trim(); if (s) t += s.length; }
     if (t) els.push({ el, t });
   }
+  // SVG strokes that draw via stroke-dasharray/offset (the "ink-draw" entrance
+  // pattern): if a stroke sits fully UNDRAWN (|dashoffset| ~= dasharray, the whole
+  // pattern pushed off the path) for the entire sweep, the reveal engine never
+  // released it / a bespoke animation shorthand overwrote the draw, so the artwork
+  // is permanently invisible. We can't read a text char count for art, so we count
+  // affected stroke ELEMENTS. Only geometry with a real visible stroke is eligible.
+  const strokes = [];
+  const undrawn = (el) => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return null;       // intentionally gone
+    if (parseFloat(cs.opacity) <= 0.05) return null;                            // opacity path handles it
+    if (!cs.stroke || cs.stroke === 'none') return null;                        // no stroke to draw
+    if (parseFloat(cs.strokeWidth) <= 0) return null;
+    const da = cs.strokeDasharray;
+    if (!da || da === 'none') return null;                                      // not a dash-drawn stroke
+    const dash = da.split(/[ ,]+/).map(parseFloat).filter((n) => !isNaN(n));
+    if (!dash.length) return null;
+    const pattern = dash.reduce((s, n) => s + n, 0);
+    if (pattern <= 0) return null;
+    // A dash pattern SHORTER than the path repeats — dashoffset is cyclic and the
+    // stroke stays visible at any offset (a decorative dashed line, marching ants).
+    // Hiding requires the pattern to swallow the whole path (the ink-draw trick:
+    // dasharray >= length). Respect pathLength — when set, the dash space is
+    // normalized to it, not to the real geometry.
+    const lenAttr = el.getAttribute && parseFloat(el.getAttribute('pathLength'));
+    let pathLen = lenAttr > 0 ? lenAttr : NaN;
+    if (isNaN(pathLen)) { try { pathLen = el.getTotalLength(); } catch { pathLen = NaN; } }
+    if (!isNaN(pathLen) && pattern < pathLen - 2) return null;                  // repeating dash — visible by construction
+    const off = Math.abs(parseFloat(cs.strokeDashoffset) || 0);
+    // undrawn iff the offset has pushed (nearly) the whole pattern off the path.
+    // tolerate 2px slack so a fully-drawn (offset 0) or partial stroke is NOT flagged.
+    return off >= pattern - 2 ? true : false;
+  };
+  for (const el of document.querySelectorAll('path, line, polyline, polygon, circle, ellipse, rect')) {
+    if (el.ownerSVGElement || el.tagName.toLowerCase() === 'svg') strokes.push(el);
+  }
   try { await (document.fonts ? document.fonts.ready : null); } catch {}
   const seen = new Set();
-  const mark = () => { for (let i = 0; i < els.length; i++) if (!seen.has(i) && reason(els[i].el) === null) seen.add(i); };
+  const strokeEligible = new Set();   // index ever seen as a dash-drawn stroke (in the draw system)
+  const strokeDrawn = new Set();      // index ever seen actually drawn (offset back to 0-ish)
+  const markStrokes = () => {
+    for (let i = 0; i < strokes.length; i++) {
+      const u = undrawn(strokes[i]);
+      if (u === null) continue;          // not (currently) a dash-drawn stroke — ignore this sample
+      strokeEligible.add(i);
+      if (u === false) strokeDrawn.add(i);
+    }
+  };
+  const mark = () => { for (let i = 0; i < els.length; i++) if (!seen.has(i) && reason(els[i].el) === null) seen.add(i); markStrokes(); };
   const docH = () => Math.max(
     document.body ? document.body.scrollHeight : 0,
     document.documentElement ? document.documentElement.scrollHeight : 0,
@@ -93,7 +139,12 @@ const SWEEP_PROBE = `(async () => {
     if (seen.has(i)) { visible += els[i].t; }
     else if (reason(els[i].el) === 'opacity') { stuck += els[i].t; }
   }
-  return { visible, total, stuck };
+  // Eligible (dash-drawn) strokes that were NEVER drawn across the whole sweep —
+  // a reveal/ink engine that didn't release them, or a bespoke animation shorthand
+  // that overwrote the draw. The art is permanently blank for a real user.
+  let strokesTracked = 0, strokesStuck = 0;
+  for (const i of strokeEligible) { strokesTracked++; if (!strokeDrawn.has(i)) strokesStuck++; }
+  return { visible, total, stuck, strokesTracked, strokesStuck };
 })()`;
 
 function stripScripts(html) {
@@ -172,11 +223,29 @@ async function main() {
     //  • no-JS gap  — content needs JS to appear (blank for crawlers/print/no-JS).
     //  • stuck reveal — content stays opacity:0 WITH JS on after scrolling (a reveal that never
     //    fires: IO not observing it, wrong class, no safety net). Worse — real users see blank.
+    // Stuck STROKES: SVG ink-draw strokes left fully undrawn for the entire sweep
+    // (LIVE — the engine ran). At least 2 affected so a single mid-animation sample
+    // can't false-fire, and at least 1/3 of the tracked draw-strokes (a whole drawing
+    // that never appears, not one decorative tick).
+    const strokesTracked = liveRes.strokesTracked || 0;
+    const strokesStuck = liveRes.strokesStuck || 0;
+    const strokeFrac = strokesTracked ? strokesStuck / strokesTracked : 0;
+    const strokeFail = strokesStuck >= 2 && strokeFrac >= 0.34;
+
     const noJsFail = !trivial && coverage < COVERAGE_FAIL;
     const stuckFail = liveRes.stuck >= TRIVIAL_CHARS && stuckFrac >= 0.15;
-    const fail = noJsFail || stuckFail;
+    const fail = noJsFail || stuckFail || strokeFail;
     let finding = null;
-    if (stuckFail) {
+    if (strokeFail) {
+      finding = `${strokesStuck} of ${strokesTracked} SVG draw-strokes stay fully undrawn ` +
+        `(stroke-dashoffset pushes the whole dash pattern off the path) for the entire sweep, ` +
+        `WITH JavaScript on — an entrance/ink-draw engine that never RELEASED them (left the ` +
+        `dash/hidden state on after entry), or a handcrafted idle/hover 'animation' shorthand on ` +
+        `the same element silently overwrote the draw (one element, one 'animation' property — ` +
+        `the last declaration wins). The artwork is permanently invisible. Release strokes to ` +
+        `their natural state when entry ends (remove the dash state), and guard bespoke animations ` +
+        `so they don't collide with the engine's.`;
+    } else if (stuckFail) {
       finding = `${Math.round(stuckFrac * 100)}% of text content stays hidden (opacity:0) WITH JavaScript on, ` +
         `after a full scroll — a reveal that never fires (the IntersectionObserver isn't observing those ` +
         `elements, the reveal class lands on the wrong node, or there's no fallback). Real users see blank ` +
@@ -194,6 +263,9 @@ async function main() {
       nojs_visible_chars: noJsVisible,
       stuck_chars: liveRes.stuck,
       stuck_fraction: +stuckFrac.toFixed(3),
+      strokes_tracked: strokesTracked,
+      strokes_stuck: strokesStuck,
+      stroke_fraction: +strokeFrac.toFixed(3),
       coverage: +coverage.toFixed(3),
       threshold: COVERAGE_FAIL,
       finding,
@@ -205,7 +277,8 @@ async function main() {
     } else if (trivial) {
       console.error(`✓ reveal_check: page has little text (${liveVisible} chars) — nothing to gate.`);
     } else {
-      console.error(`✓ reveal_check: ${Math.round(coverage * 100)}% visible without JS; ${Math.round(stuckFrac * 100)}% stuck-hidden with JS (${liveVisible}/${liveTotal} chars live).`);
+      const strokeNote = strokesTracked ? `; ${strokesStuck}/${strokesTracked} draw-strokes stuck` : '';
+      console.error(`✓ reveal_check: ${Math.round(coverage * 100)}% visible without JS; ${Math.round(stuckFrac * 100)}% stuck-hidden with JS (${liveVisible}/${liveTotal} chars live)${strokeNote}.`);
     }
     process.exit(fail ? 1 : 0);
   } catch (e) {
